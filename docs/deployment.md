@@ -1,8 +1,21 @@
 # Deployment
 
-This is the guide for taking Instamart Discovery Engine from local Docker Compose to a real, publicly reachable deployment: **Vercel** (frontend) + **Render** (backend API + daily extraction cron + Redis) + **Supabase** (Postgres/pgvector + raw-artifact storage), with **GitHub** as the source of truth both platforms deploy from.
+This is the phased guide for taking Instamart Discovery Engine from local Docker Compose to a real, publicly reachable deployment: **Vercel** (frontend) + **Render** (backend API + daily extraction cron + Redis) + **Supabase** (Postgres/pgvector + raw-artifact storage), with **GitHub** as the source of truth both platforms deploy from.
 
-## 1. Why this split (not "everything on Vercel")
+## Status at a glance
+
+| Phase | What it covers | Status |
+|---|---|---|
+| 0 | Repository readiness — config files, local verification, CI | ✅ **Done** |
+| 1 | Push to GitHub | ✅ **Done** — `https://github.com/md-ammar-97/Threshold`, `main`, CI green |
+| 2 | Supabase — database + storage | ⬜ **Not started** — needs your Supabase account |
+| 3 | Render — backend API + daily cron + Redis | ⬜ **Not started** — depends on Phase 2 |
+| 4 | Vercel — frontend | ⬜ **Not started** — depends on Phase 3 |
+| 5 | End-to-end verification | ⬜ **Not started** — depends on Phases 2–4 |
+
+**Next up: Phase 2 (Supabase).** Nothing past Phase 1 can be done without your own accounts and credentials on Supabase/Render/Vercel/Groq/etc. — those steps are written for you to run yourself.
+
+## Why this split (not "everything on Vercel")
 
 Vercel is excellent for the frontend — the app is a plain static Vite build with no server-side rendering, and Vercel auto-detects that.
 
@@ -17,7 +30,7 @@ So the backend goes to **Render** instead: it deploys the same Docker image as a
 
 **Redis stays**, via Render's own Redis-compatible Key Value service — one platform, no extra account. Today Redis only backs a `/health` ping and an unused Celery broker (`core/celery_app.py` defines queues, but zero tasks are registered anywhere in the codebase — it's forward-looking scaffolding, not something currently load-bearing). Keeping it costs nothing extra on Render and means `/health` and Celery keep behaving exactly like local dev if that scaffolding is ever picked up.
 
-## 2. Accounts and keys you need
+## Accounts and keys you need
 
 | Provider | What for | Get it from |
 |---|---|---|
@@ -33,9 +46,21 @@ So the backend goes to **Render** instead: it deploys the same Docker image as a
 
 Reddit's own `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` are declared in config but the Reddit connector currently goes through Apify, not PRAW/OAuth directly — leave them blank unless you've wired up the OAuth path yourself.
 
-## 3. Push the code to GitHub
+---
 
-The repo has no commits yet as of this guide being written. From the repo root:
+## Phase 0 — Repository readiness ✅ Done
+
+Everything needed to deploy is already written, committed, and verified:
+
+- `backend/Dockerfile.prod` — production image; installs the CPU-only PyTorch wheel explicitly (the default wheel pulls the full CUDA toolkit even though Render's services are CPU-only — verified locally: CUDA build is 3.3GB/~24min, CPU-only build is 779MB/~10min).
+- `render.yaml` — Blueprint defining all three Render resources (`instamart-api`, `instamart-daily-extraction`, `instamart-redis`) from one file.
+- `frontend/vercel.json` — pins the Vite build command/output dir and adds the SPA catch-all rewrite `react-router-dom` needs.
+- `scripts/daily_extraction.sh` — orchestrates the 8-source ingest → media extraction → classify/embed/cluster/synthesize/insights pipeline; verified to run end-to-end and degrade gracefully (continues past a failed source instead of aborting).
+- `.github/workflows/ci.yml` — lints (ruff/eslint), type-checks (mypy/tsc), runs migrations against a real Postgres, runs the P0 adversarial suite, runs the full test suite, and builds the frontend, on every push. **Currently green.**
+
+Local verification performed before any of this was trusted: production Docker image built and smoke-tested against real Postgres/Redis (`/health` returns `ok`), `scripts/daily_extraction.sh` run live against the dev stack, full backend test suite (233 tests) passed against a freshly-migrated database matching CI's exact environment, frontend `npm ci`/lint/type-check/build all verified in a Linux Node 22 container matching the CI runner.
+
+## Phase 1 — Push to GitHub ✅ Done
 
 ```bash
 git add -A
@@ -46,12 +71,16 @@ git branch -M main
 git push -u origin main
 ```
 
-`.gitignore` already excludes `.env`, `data/raw|interim|processed/**`, `node_modules`, and the Python virtualenv — verified before this guide was written. Double-check `git status` yourself before pushing regardless; it's cheap insurance against a leaked key.
+Live at `https://github.com/md-ammar-97/Threshold`, branch `main`, CI passing on every push. `.gitignore` excludes `.env`, `data/raw|interim|processed/**`, `node_modules`, and the Python virtualenv — verified clean before every push so far.
 
-## 4. Supabase — database and storage
+---
+
+## Phase 2 — Supabase: database + storage ⬜ Not started
+
+**You'll need to do this yourself** — it requires your own Supabase account and produces secrets that must never be pasted into this chat or committed to the repo.
 
 1. Create a new Supabase project.
-2. **Database → Extensions**: enable `vector` (pgvector). This project's `report_export.sha256`, embeddings, and every other table assume Postgres 16+ with pgvector, which Supabase provides.
+2. **Database → Extensions**: enable `vector` (pgvector). This project's embeddings and every vector-backed table assume Postgres 16+ with pgvector, which Supabase provides.
 3. **Database → Connection string**: copy the **direct** connection (port `5432`), not the pooled/PgBouncer one (port `6543`). `asyncpg` (this app's driver) doesn't speak PgBouncer's transaction-pooling mode cleanly without extra tuning that isn't configured here — use the direct connection to avoid that entirely. Rewrite it to this app's driver prefix:
    ```
    postgresql+asyncpg://postgres:<password>@<project-ref>.supabase.co:5432/postgres
@@ -81,26 +110,38 @@ git push -u origin main
    ```
    Without this, classification has nothing to classify against.
 
-## 5. Render — backend API + daily cron + Redis
+**Exit criteria**: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` all in hand; `alembic upgrade head` and the taxonomy seed both ran successfully against the Supabase database.
+
+## Phase 3 — Render: backend API + daily cron + Redis ⬜ Not started
+
+Depends on Phase 2 for `DATABASE_URL`/`SUPABASE_*`. Also needs `GROQ_API_KEY` (console.groq.com), `OPENROUTER_API_KEY` (openrouter.ai), `HF_API_TOKEN` (huggingface.co), `APIFY_TOKEN` (apify.com), and optionally `RESEND_API_KEY`/`RESEND_FROM_EMAIL` (resend.com) in hand.
 
 This repo ships a `render.yaml` Blueprint at the repo root defining all three Render resources (`instamart-api`, `instamart-daily-extraction`, `instamart-redis`) from one file.
 
 1. Render dashboard → **New → Blueprint**, connect the GitHub repo, select `render.yaml`.
 2. Render will prompt for every env var marked `sync: false` in the blueprint — fill in `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `HF_API_TOKEN`, `APIFY_TOKEN`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (these live in one shared `envVarGroup`, so you only enter them once for both the API and the cron job).
-3. Deploy. **The first build takes a few minutes** — `backend/Dockerfile.prod` installs the CPU-only PyTorch wheel explicitly (`torch` pulls the full CUDA toolkit by default even though Render's services are CPU-only; verified locally: the CUDA build is 3.3GB and ~24 minutes, the CPU-only build is 779MB and ~10 minutes). Subsequent deploys reuse Docker layer caching and are much faster unless `backend/pyproject.toml` changes.
+3. Deploy. **The first build takes a few minutes** — see Phase 0's note on the CPU-only PyTorch build. Subsequent deploys reuse Docker layer caching and are much faster unless `backend/pyproject.toml` changes.
 4. Once live, confirm `https://<your-api>.onrender.com/health` returns `{"status": "ok", ...}`.
 5. **Plan note**: `instamart-api` is set to Render's `starter` plan in `render.yaml`, not `free` — Render's free web-service tier spins down after 15 minutes of inactivity, which would mean the first request after any quiet period gets a slow cold-start (or times out from the frontend's perspective). `instamart-daily-extraction` is fine on `free` since it's only invoked on its schedule, never expected to stay warm.
 6. The cron job's schedule is `30 0 * * *` — Render Cron Jobs use standard cron syntax in **UTC**. `00:30 UTC = 6:00 AM IST` (IST is UTC+5:30 — a 30-minute offset, not a clean hour shift, easy to get wrong). You can trigger a manual run from the Render dashboard (cron service → "Trigger Run") to test it without waiting for the schedule, and check past runs' logs the same way.
 7. **Groq free-tier rate limits will govern how long the cron job actually takes.** Verified live during development: Groq's `on_demand` tier caps `openai/gpt-oss-120b` at 8,000 tokens/minute *and* 200,000 tokens/day. The classify/synthesize step in `scripts/pipeline.py` retries transient 429s automatically and fails over to `OPENROUTER_API_KEY` (`LLM_FALLBACK_PROVIDER`) once Groq's per-call retries are exhausted, so a rate-limited run degrades gracefully rather than crashing — but on a heavy ingestion day (100s of new records), the daily job can genuinely take well over an hour to finish classifying everything, and if the *daily* Groq quota is already exhausted (e.g. from manual testing earlier that day), most calls will fail over to the fallback model for the rest of the day. If this matters for your volume, upgrade the Groq org to a paid tier before relying on the daily cron.
 
-## 6. Vercel — frontend
+**Exit criteria**: `https://<your-api>.onrender.com/health` returns `{"status": "ok", ...}`; a manually-triggered cron run completes (or clearly degrades gracefully under rate limits, per point 7).
+
+## Phase 4 — Vercel: frontend ⬜ Not started
+
+Depends on Phase 3 for the live Render API URL.
 
 1. Vercel dashboard → **Add New → Project**, import the GitHub repo.
 2. Set **Root Directory** to `frontend`. Vercel will auto-detect the Vite framework preset; `frontend/vercel.json` (committed in this repo) pins the build command (`npm run build`), output directory (`dist`), and adds a catch-all rewrite to `index.html` — required because this is a client-side-routed SPA (`react-router-dom`'s `BrowserRouter`); without the rewrite, refreshing on a deep link like `/themes/<id>` would 404.
 3. Add one environment variable: `VITE_API_URL` = your deployed Render API's public URL (e.g. `https://instamart-api.onrender.com`) — this is the *only* place the frontend reads a backend URL from (`frontend/src/lib/api/client.ts`), confirmed by grep across the whole `frontend/src` tree.
 4. Deploy. Vercel will auto-redeploy on every push to `main` from here on.
 
-## 7. Verify the whole thing end to end
+**Exit criteria**: Vercel URL loads the app shell (Themes/Insights/Validation pages render, even if empty pre-first-extraction).
+
+## Phase 5 — End-to-end verification ⬜ Not started
+
+Depends on Phases 2–4 all being live.
 
 - `GET /health` on the Render URL → `{"status": "ok", "postgres": "ok", "redis": "ok"}`.
 - Open the Vercel URL, confirm the Themes/Insights/Validation pages load (they'll be empty until the first extraction run has happened).
@@ -108,7 +149,13 @@ This repo ships a `render.yaml` Blueprint at the repo root defining all three Re
 - Reload the frontend — Themes/Insights should now show real data.
 - Create a report in the Report Builder, export it to Markdown, confirm the content traces back to real theme/insight data (not a placeholder).
 
-## 8. Environment variable reference
+**Exit criteria**: all five checks above pass. At that point the deployment is fully live and self-sustaining on its daily schedule.
+
+---
+
+## Reference
+
+### Environment variable reference
 
 Every field on `Settings` (`backend/src/instamart_engine/core/config.py`), grouped the same way the file itself groups them. "Required in prod" means the app is meaningfully degraded or non-functional without it; blank/default is otherwise fine.
 
@@ -121,7 +168,7 @@ Every field on `Settings` (`backend/src/instamart_engine/core/config.py`), group
 | `RAW_STORAGE_PATH` | `./data/raw` | No | Only used by the filesystem backend |
 | `SUPABASE_URL` | — | **Yes** (if using Supabase storage) | Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | — | **Yes** | The `service_role` secret, not `anon` |
-| `SUPABASE_STORAGE_BUCKET` | — | **Yes** | Bucket created in step 4 above |
+| `SUPABASE_STORAGE_BUCKET` | — | **Yes** | Bucket created in Phase 2 |
 | `LLM_PROVIDER` | `groq` | No | |
 | `LLM_FALLBACK_PROVIDER` | `openrouter` | No | |
 | `LLM_MODEL_CLASSIFICATION`/`_SYNTHESIS`/`_ANSWER` | `openai/gpt-oss-120b` | No | Groq-hosted model name |
@@ -143,7 +190,7 @@ Every field on `Settings` (`backend/src/instamart_engine/core/config.py`), group
 | `MODEL_MAX_RETRIES` | `3` | No | |
 | `MODEL_CONCURRENCY` | `4` | No | |
 
-## 9. Redeploys and rollback
+### Redeploys and rollback
 
 Both Vercel and Render auto-deploy on every push to `main` once connected — no GitHub Actions changes needed for that (the existing `.github/workflows/ci.yml` only lints/tests/builds; it doesn't deploy anything, and doesn't need to).
 
@@ -151,6 +198,6 @@ Both Vercel and Render auto-deploy on every push to `main` once connected — no
 - **Render rollback**: dashboard → the `instamart-api` service → Deploys → pick a previous successful deploy → "Rollback." Also instant (reuses the previously-built image).
 - **Database migrations are not automatically rolled back** by either of the above — if a deploy included a migration, rolling back the app code without also considering the schema can leave things inconsistent. For this project's current size, treat migrations as forward-only and fix forward rather than reaching for `alembic downgrade`.
 
-## 10. Local dev is unaffected
+### Local dev is unaffected
 
 Nothing here changes local development. `docker compose up --build` still uses `backend/Dockerfile` (the dev image, editable install + `--reload`) and `frontend/Dockerfile` (the dev image, `npm run dev`) exactly as before — `backend/Dockerfile.prod` and `render.yaml`/`vercel.json` are new, additive files, not replacements.
