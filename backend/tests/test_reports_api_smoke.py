@@ -5,21 +5,77 @@ content back. Mirrors `test_validation_api_smoke.py`'s TestClient pattern
 (one `with TestClient(app) as client:` block — see that file's docstring
 for why the cached engine/session-factory singleton needs the reset before
 entering the block).
+
+Unlike `test_validation_api_smoke.py` (which only asserts structure, since
+it explicitly tolerates the shared dev DB having no data), report creation
+defaults `analysis_run_id`/`theme_set_id` from the *latest* theme_set when
+not given explicitly — which doesn't exist on a genuinely empty database
+(e.g. a fresh CI run). So this test seeds its own minimal AnalysisRun/
+ThemeSet first (committed for real, not the rolled-back `db_session`
+fixture, since the TestClient's requests need to actually see it) and
+passes both ids explicitly, making the test self-contained regardless of
+what else is in the database.
 """
 
+import asyncio
+import uuid
+
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import create_async_engine
 
 import instamart_engine.core.database as database_module
+from instamart_engine.analysis.models import AnalysisRun, AnalysisRunStatus
 from instamart_engine.api.main import app
+from instamart_engine.core.config import get_settings
+from instamart_engine.themes.models import ThemeSet, ThemeSetStatus
+
+
+async def _seed_minimal_theme_set() -> tuple[uuid.UUID, uuid.UUID]:
+    engine = create_async_engine(get_settings().DATABASE_URL)
+    try:
+        async with engine.begin() as connection:
+            from sqlalchemy.ext.asyncio import AsyncSession
+
+            session = AsyncSession(bind=connection, expire_on_commit=False)
+            analysis_run = AnalysisRun(
+                name=f"smoke-test-{uuid.uuid4()}",
+                status=AnalysisRunStatus.RUNNING,
+                dataset_snapshot={},
+                taxonomy_version_id=uuid.uuid4(),
+                classification_model_configuration_id=uuid.uuid4(),
+            )
+            session.add(analysis_run)
+            await session.flush()
+
+            theme_set = ThemeSet(
+                analysis_run_id=analysis_run.id,
+                version_number=1,
+                name="smoke-test-theme-set",
+                status=ThemeSetStatus.READY_FOR_REVIEW,
+                clustering_algorithm="hdbscan",
+                clustering_configuration={},
+                eligible_record_count=0,
+            )
+            session.add(theme_set)
+            await session.flush()
+            return analysis_run.id, theme_set.id
+    finally:
+        await engine.dispose()
 
 
 def test_report_builder_end_to_end() -> None:
     database_module._engine = None
     database_module._session_factory = None
+    analysis_run_id, theme_set_id = asyncio.run(_seed_minimal_theme_set())
 
     with TestClient(app) as client:
         create_response = client.post(
-            "/api/v1/reports", json={"title": "Smoke Test Report"}
+            "/api/v1/reports",
+            json={
+                "title": "Smoke Test Report",
+                "analysis_run_id": str(analysis_run_id),
+                "theme_set_id": str(theme_set_id),
+            },
         )
         assert create_response.status_code == 201, create_response.text
         report = create_response.json()
