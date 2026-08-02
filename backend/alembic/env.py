@@ -94,7 +94,13 @@ from instamart_engine.validation.models import (  # noqa: E402,F401
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL)
+# `set_main_option` stores the value via `configparser`, which treats `%` as
+# its own interpolation syntax (`%(name)s`) — a literal `%` in the URL (e.g.
+# a URL-encoded special character in the DB password, like `%40` for `@`)
+# must be escaped to `%%` here or `configparser` raises `ValueError: invalid
+# interpolation syntax` when the value is set, before any DB connection is
+# even attempted.
+config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
