@@ -1,0 +1,59 @@
+# Production image — built from the REPO ROOT as build context (not
+# ./backend), because it has to serve two different Render services from
+# one image: the `web` service (uvicorn) and the `cron` service
+# (scripts/daily_extraction.sh). Both need `scripts/` and `prompts/`
+# alongside the installed package, not just `backend/src`.
+#
+# Still an EDITABLE install (`pip install -e .`), not a stylistic choice —
+# `prompts/*.md` are located at runtime via `Path(__file__).resolve()
+# .parents[N]` in several modules (analysis/classify.py,
+# insights/synthesize.py, research/planner.py, research/generate.py,
+# themes/synthesize.py). A non-editable install copies the package into
+# site-packages, which relocates `__file__` and silently breaks that
+# resolution. `--reload` and the `[dev]` extras (pytest/ruff/mypy) are
+# dropped since neither is needed at runtime — everything else about the
+# install mode matches ./backend/Dockerfile (the local-dev image) exactly.
+#
+# Layout mirrors the existing dev image: code ends up at /app/src, so
+# `prompts` goes at the container-root /prompts (same convention
+# docker-compose.yml already uses for local dev — see its
+# `./prompts:/prompts:ro` mount). `scripts/*.py` don't need to be at any
+# particular path relative to the package — they each do their own
+# `sys.path.insert(0, .../backend/src)`, which resolves to a path that
+# doesn't exist in this image and is silently a no-op, since the editable
+# install already makes `instamart_engine` globally importable regardless.
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-hin \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/pyproject.toml ./pyproject.toml
+COPY backend/src ./src
+COPY scripts ./scripts
+COPY prompts /prompts
+
+# Render's web/cron services are CPU-only, but `sentence-transformers` (a
+# transitive dep, pulled in even though EMBEDDING_PROVIDER=hosted never
+# uses it locally) depends on plain `torch`, whose default PyPI wheel drags
+# in the full CUDA toolkit (~4GB of nvidia-*/triton packages nothing here
+# can ever use). Installing the CPU-only wheel first satisfies that
+# dependency before `pip install -e .` gets a chance to pull the CUDA one.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+RUN pip install --no-cache-dir -e .
+
+EXPOSE 8000
+
+# Render injects $PORT at runtime; shell form so the variable expands
+# (exec-form CMD can't do substitution). The `cron` service in render.yaml
+# overrides this with its own startCommand (bash scripts/daily_extraction.sh)
+# — this CMD is only ever used by the `web` service.
+CMD uvicorn instamart_engine.api.main:app --host 0.0.0.0 --port ${PORT:-8000}

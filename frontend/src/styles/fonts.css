@@ -1,0 +1,47 @@
+/*
+ * Self-hosted Basis Grotesque Pro — design.md §8.1. Files are the Arabic
+ * companion cut (docs/Basis Grotesque PRO Font Family/), which ships full
+ * Latin glyph coverage alongside the Arabic script, so it's used directly
+ * for the UI's Latin text. No italic or variable-font file was supplied,
+ * so only these five static weights are registered.
+ */
+
+@font-face {
+  font-family: "Basis Grotesque Pro";
+  src: url("/fonts/basis-grotesque/BasisGrotesqueArabicPro-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Basis Grotesque Pro";
+  src: url("/fonts/basis-grotesque/BasisGrotesqueArabicPro-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Basis Grotesque Pro";
+  src: url("/fonts/basis-grotesque/BasisGrotesqueArabicPro-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Basis Grotesque Pro";
+  src: url("/fonts/basis-grotesque/BasisGrotesqueArabicPro-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Basis Grotesque Pro";
+  src: url("/fonts/basis-grotesque/BasisGrotesqueArabicPro-Black.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}

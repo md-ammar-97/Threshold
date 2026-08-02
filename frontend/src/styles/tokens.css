@@ -1,0 +1,339 @@
+/*
+ * Design tokens — design.md Part I (§6-13, §36).
+ *
+ * Layer order: primitives -> semantic color (light/dark) -> spacing/shape/
+ * elevation/data-viz. Components must consume semantic tokens
+ * (--color-bg-*, --color-text-*, etc.), never the raw primitive scales
+ * below, so a future brand-kit swap only touches this file (design.md §3.3).
+ */
+
+:root {
+  /* ---- Primitives: neutral scale (Swiggy charcoal-anchored) ----
+     neutral-150/600/800 are exact Swiggy brand values (border/muted/
+     foreground — design.md §7, §3.3); the rest are interpolated to match. */
+  --neutral-0: #ffffff;
+  --neutral-25: #fcfcfc;
+  --neutral-50: #f7f7f8;
+  --neutral-100: #f1f1f3;
+  --neutral-150: #e9e9eb;
+  --neutral-200: #dcdcdf;
+  --neutral-300: #c4c4c9;
+  --neutral-400: #9fa0a8;
+  --neutral-500: #82838c;
+  --neutral-600: #686b78;
+  --neutral-700: #52545f;
+  --neutral-800: #282c3f;
+  --neutral-850: #1f2231;
+  --neutral-900: #171927;
+  --neutral-950: #0f1019;
+
+  /* ---- Primitives: brand orange (Swiggy #FC8019 exact at 500) ---- */
+  --orange-50: #fff4ec;
+  --orange-100: #ffe4cc;
+  --orange-200: #ffc898;
+  --orange-300: #ffaa63;
+  --orange-400: #fd9440;
+  --orange-500: #fc8019;
+  --orange-600: #e06d0f;
+  --orange-700: #b8590d;
+  --orange-800: #8f450a;
+  --orange-900: #6b3308;
+
+  /* ---- Primitives: discovery green ---- */
+  --green-50: #ecfdf5;
+  --green-100: #d1fae5;
+  --green-200: #a7f3d0;
+  --green-300: #6ee7b7;
+  --green-400: #34d399;
+  --green-500: #16a36a;
+  --green-600: #0e8254;
+  --green-700: #0d6745;
+  --green-800: #0d5239;
+  --green-900: #0b4330;
+
+  /* ---- Primitives: evidence blue ---- */
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-300: #93c5fd;
+  --blue-400: #60a5fa;
+  --blue-500: #3579e8;
+  --blue-600: #245fc4;
+  --blue-700: #1d4ca0;
+  --blue-800: #1e407f;
+  --blue-900: #1e3768;
+
+  /* ---- Primitives: synthesis violet ---- */
+  --violet-50: #f5f3ff;
+  --violet-100: #ede9fe;
+  --violet-200: #ddd6fe;
+  --violet-300: #c4b5fd;
+  --violet-400: #a78bfa;
+  --violet-500: #8063e8;
+  --violet-600: #6947d2;
+  --violet-700: #5738ae;
+  --violet-800: #49318c;
+  --violet-900: #3d2b72;
+
+  /* ---- Primitives: status colors ---- */
+  --amber-50: #fff8e6;
+  --amber-500: #b76a00;
+  --amber-700: #854a00;
+  --red-50: #fff0f0;
+  --red-500: #d33a3a;
+  --red-700: #a52222;
+  --cyan-50: #ecfeff;
+  --cyan-500: #0e91a5;
+  --cyan-700: #0e6674;
+
+  /* ---- Semantic color: light mode (Swiggy: background/foreground/muted/
+     border/card/accent — design.md §7) ---- */
+  --color-bg-canvas: var(--neutral-0);
+  --color-bg-surface: var(--neutral-0);
+  --color-bg-surface-subtle: var(--neutral-50);
+  --color-bg-surface-muted: var(--neutral-100);
+  --color-bg-elevated: var(--neutral-0);
+  --color-bg-inverse: var(--neutral-800);
+  --color-bg-scrim: rgb(40 44 63 / 56%);
+
+  --color-text-primary: var(--neutral-800);
+  --color-text-secondary: var(--neutral-600);
+  --color-text-tertiary: var(--neutral-500);
+  --color-text-disabled: var(--neutral-400);
+  --color-text-inverse: var(--neutral-0);
+  --color-text-link: var(--blue-700);
+
+  --color-border-subtle: var(--neutral-100);
+  --color-border-default: var(--neutral-150);
+  --color-border-strong: var(--neutral-300);
+  --color-border-focus: var(--blue-500);
+
+  --color-action-primary: var(--orange-500);
+  --color-action-primary-hover: var(--orange-600);
+  --color-action-primary-active: var(--orange-700);
+  --color-action-primary-subtle: var(--orange-50);
+  --color-action-on-primary: var(--neutral-0);
+
+  --color-discovery-default: var(--green-600);
+  --color-discovery-subtle: var(--green-50);
+  --color-discovery-on: var(--neutral-0);
+
+  --color-evidence-default: var(--blue-600);
+  --color-evidence-subtle: var(--blue-50);
+  --color-evidence-on: var(--neutral-0);
+
+  --color-synthesis-default: var(--violet-600);
+  --color-synthesis-subtle: var(--violet-50);
+  --color-synthesis-on: var(--neutral-0);
+
+  --color-status-success: var(--green-700);
+  --color-status-success-subtle: var(--green-50);
+  --color-status-warning: var(--amber-700);
+  --color-status-warning-subtle: var(--amber-50);
+  --color-status-danger: var(--red-700);
+  --color-status-danger-subtle: var(--red-50);
+  --color-status-info: var(--blue-700);
+  --color-status-info-subtle: var(--blue-50);
+
+  /* Back-compat aliases used by Phase 0 pages; equal to the semantic tokens
+     above so nothing needs updating when this file grew from the §54 seed. */
+  --color-evidence: var(--color-evidence-default);
+  --color-synthesis: var(--color-synthesis-default);
+  --color-discovery: var(--color-discovery-default);
+  --color-warning: var(--color-status-warning);
+  --color-danger: var(--color-status-danger);
+
+  /* ---- Data visualization ---- */
+  --data-categorical-1: var(--blue-500);
+  --data-categorical-2: var(--violet-500);
+  --data-categorical-3: var(--green-500);
+  --data-categorical-4: var(--orange-500);
+  --data-categorical-5: var(--cyan-500);
+  --data-categorical-6: var(--amber-500);
+  --data-confidence-low: var(--amber-500);
+  --data-confidence-unsupported: var(--red-500);
+  --data-confidence-reviewed: var(--green-500);
+
+  /* ---- Shape ---- */
+  --radius-none: 0px;
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* ---- Borders ---- */
+  --border-width-hairline: 1px;
+  --border-width-strong: 2px;
+  --border-width-accent: 3px;
+
+  /* ---- Spacing (4px base scale) ---- */
+  --space-0: 0px;
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* ---- Elevation (light mode) ---- */
+  --shadow-none: none;
+  --shadow-xs: 0 1px 2px rgb(16 24 20 / 0.05);
+  --shadow-sm: 0 6px 18px rgb(16 24 20 / 0.07);
+  --shadow-md: 0 18px 48px rgb(16 24 20 / 0.12);
+  --shadow-lg: 0 28px 80px rgb(16 24 20 / 0.18);
+
+  /* ---- Motion (design.md §38) ---- */
+  --motion-duration-instant: 80ms;
+  --motion-duration-fast: 140ms;
+  --motion-duration-standard: 220ms;
+  --motion-duration-slow: 360ms;
+  --motion-duration-reveal: 520ms;
+
+  --motion-easing-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-easing-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
+  --motion-easing-linear: linear;
+}
+
+/* Class-based override — toggled by the appearance control (design.md §16).
+   Swiggy dark values are literal (design.md §7): background #121212,
+   foreground #e9e9eb, muted #93959f, border #282c3f (the light-mode
+   charcoal, reused here as a divider tone), card #1a1a1a, accent #fc8019
+   unchanged from light mode. */
+.dark {
+  --color-bg-canvas: #121212;
+  --color-bg-surface: #1a1a1a;
+  --color-bg-surface-subtle: #202020;
+  --color-bg-surface-muted: #262626;
+  --color-bg-elevated: #1a1a1a;
+  --color-bg-inverse: var(--neutral-100);
+  --color-bg-scrim: rgb(0 0 0 / 72%);
+
+  --color-text-primary: #e9e9eb;
+  --color-text-secondary: #93959f;
+  --color-text-tertiary: #6f7079;
+  --color-text-disabled: #4a4b52;
+  --color-text-inverse: var(--neutral-800);
+  --color-text-link: var(--blue-300);
+
+  --color-border-subtle: #1f1f1f;
+  --color-border-default: #282c3f;
+  --color-border-strong: #3a3d4d;
+  --color-border-focus: var(--blue-400);
+
+  --color-action-primary: var(--orange-500);
+  --color-action-primary-hover: var(--orange-400);
+  --color-action-primary-active: var(--orange-300);
+  --color-action-primary-subtle: #3a2510;
+  --color-action-on-primary: var(--neutral-0);
+
+  --color-discovery-default: var(--green-400);
+  --color-discovery-subtle: #123326;
+  --color-discovery-on: var(--neutral-950);
+
+  --color-evidence-default: var(--blue-400);
+  --color-evidence-subtle: #142842;
+  --color-evidence-on: var(--neutral-950);
+
+  --color-synthesis-default: var(--violet-400);
+  --color-synthesis-subtle: #29203f;
+  --color-synthesis-on: var(--neutral-950);
+
+  --color-status-success: var(--green-300);
+  --color-status-success-subtle: #123326;
+  --color-status-warning: #f2b85b;
+  --color-status-warning-subtle: #3b2a0c;
+  --color-status-danger: #ff8181;
+  --color-status-danger-subtle: #3f1919;
+  --color-status-info: var(--blue-300);
+  --color-status-info-subtle: #142842;
+
+  --color-evidence: var(--color-evidence-default);
+  --color-synthesis: var(--color-synthesis-default);
+  --color-discovery: var(--color-discovery-default);
+  --color-warning: var(--color-status-warning);
+  --color-danger: var(--color-status-danger);
+}
+
+/* OS-preference fallback when no explicit .dark/.light class is present. */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --color-bg-canvas: #121212;
+    --color-bg-surface: #1a1a1a;
+    --color-bg-surface-subtle: #202020;
+    --color-bg-surface-muted: #262626;
+    --color-bg-elevated: #1a1a1a;
+    --color-bg-inverse: var(--neutral-100);
+    --color-bg-scrim: rgb(0 0 0 / 72%);
+
+    --color-text-primary: #e9e9eb;
+    --color-text-secondary: #93959f;
+    --color-text-tertiary: #6f7079;
+    --color-text-disabled: #4a4b52;
+    --color-text-inverse: var(--neutral-800);
+    --color-text-link: var(--blue-300);
+
+    --color-border-subtle: #1f1f1f;
+    --color-border-default: #282c3f;
+    --color-border-strong: #3a3d4d;
+    --color-border-focus: var(--blue-400);
+
+    --color-action-primary: var(--orange-500);
+    --color-action-primary-hover: var(--orange-400);
+    --color-action-primary-active: var(--orange-300);
+    --color-action-primary-subtle: #3a2510;
+    --color-action-on-primary: var(--neutral-0);
+
+    --color-discovery-default: var(--green-400);
+    --color-discovery-subtle: #123326;
+    --color-discovery-on: var(--neutral-950);
+
+    --color-evidence-default: var(--blue-400);
+    --color-evidence-subtle: #142842;
+    --color-evidence-on: var(--neutral-950);
+
+    --color-synthesis-default: var(--violet-400);
+    --color-synthesis-subtle: #29203f;
+    --color-synthesis-on: var(--neutral-950);
+
+    --color-status-success: var(--green-300);
+    --color-status-success-subtle: #123326;
+    --color-status-warning: #f2b85b;
+    --color-status-warning-subtle: #3b2a0c;
+    --color-status-danger: #ff8181;
+    --color-status-danger-subtle: #3f1919;
+    --color-status-info: var(--blue-300);
+    --color-status-info-subtle: #142842;
+
+    --color-evidence: var(--color-evidence-default);
+    --color-synthesis: var(--color-synthesis-default);
+    --color-discovery: var(--color-discovery-default);
+    --color-warning: var(--color-status-warning);
+    --color-danger: var(--color-status-danger);
+  }
+}
+
+/* Reduced motion — design.md §40. Belt-and-suspenders alongside the JS
+   `usePrefersReducedMotion` hook in components/motion: any CSS transition
+   that isn't gated in JS still collapses to near-instant here. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-instant: 0ms;
+    --motion-duration-fast: 0ms;
+    --motion-duration-standard: 1ms;
+    --motion-duration-slow: 1ms;
+    --motion-duration-reveal: 1ms;
+  }
+}

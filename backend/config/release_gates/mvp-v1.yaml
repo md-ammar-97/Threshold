@@ -1,0 +1,38 @@
+# Release-gate configuration. ai_evals.md §85. Version-controlled; the
+# database stores a snapshot of whichever config a run actually used
+# (evaluation_run.configuration_snapshot), so this file can evolve without
+# breaking the ability to reproduce a past decision.
+#
+# Metric keys below are exactly what validation/runners.py computes today
+# (one `<grader_key>_pass_rate` / `<grader_key>_hard_failure_count` /
+# `<grader_key>_mean_score` triple per grader that ran). A key with no
+# matching metric on a given run is skipped, not treated as a failure
+# (release_gates.py's own "not applicable for this run" handling) — so one
+# config safely covers grounding, classification, retrieval, and theme runs
+# even though each only produces some of these keys.
+
+release_profile: mvp-v1
+
+zero_tolerance:
+  - citation_integrity
+  - demographic_inference
+  - insufficient_evidence_policy
+  - unsupported_label
+  - classification_demographic_inference
+  - cross_version_contamination
+  - deleted_object_retrieval
+  - representative_evidence
+  - theme_naming_integrity
+
+metrics:
+  schema_integrity_pass_rate:
+    minimum: 1.00
+
+  citation_integrity_mean_score:
+    minimum: 0.95
+
+  causal_overclaim_pass_rate:
+    minimum: 0.90
+
+  duplicate_evidence_pass_rate:
+    minimum: 0.95

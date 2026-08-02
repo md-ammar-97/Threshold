@@ -1,0 +1,130 @@
+@import "tailwindcss";
+@import "./fonts.css";
+@import "./tokens.css";
+@import "./typography.css";
+
+/* Fonts are self-hosted via @fontsource-variable (imported in main.tsx) —
+   these two variables replace what next/font/google used to inject as
+   className-scoped custom properties on <html>. Fallback stacks keep
+   layout stable if a font file is slow/blocked. */
+:root {
+  --font-geist-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-geist-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+}
+
+/* Tailwind v4 dark variant keyed off the same `.dark` class the appearance
+   toggle sets on <html> (tokens.css already swaps every --color-* value on
+   that class) — `dark:` utilities and the CSS variables stay in sync. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-background: var(--color-bg-canvas);
+  --color-foreground: var(--color-text-primary);
+
+  --color-canvas: var(--color-bg-canvas);
+  --color-surface: var(--color-bg-surface);
+  --color-surface-subtle: var(--color-bg-surface-subtle);
+  --color-surface-muted: var(--color-bg-surface-muted);
+  --color-elevated: var(--color-bg-elevated);
+  --color-inverse: var(--color-bg-inverse);
+
+  --color-primary: var(--color-text-primary);
+  --color-secondary: var(--color-text-secondary);
+  --color-tertiary: var(--color-text-tertiary);
+  --color-disabled: var(--color-text-disabled);
+  --color-link: var(--color-text-link);
+
+  --color-border-subtle: var(--color-border-subtle);
+  --color-border-default: var(--color-border-default);
+  --color-border-strong: var(--color-border-strong);
+  --color-border-focus: var(--color-border-focus);
+
+  --color-action: var(--color-action-primary);
+  --color-action-hover: var(--color-action-primary-hover);
+  --color-action-active: var(--color-action-primary-active);
+  --color-action-subtle: var(--color-action-primary-subtle);
+  --color-on-action: var(--color-action-on-primary);
+
+  --color-discovery: var(--color-discovery-default);
+  --color-discovery-subtle: var(--color-discovery-subtle);
+  --color-evidence: var(--color-evidence-default);
+  --color-evidence-subtle: var(--color-evidence-subtle);
+  --color-synthesis: var(--color-synthesis-default);
+  --color-synthesis-subtle: var(--color-synthesis-subtle);
+
+  --color-success: var(--color-status-success);
+  --color-success-subtle: var(--color-status-success-subtle);
+  --color-warning: var(--color-status-warning);
+  --color-warning-subtle: var(--color-status-warning-subtle);
+  --color-danger: var(--color-status-danger);
+  --color-danger-subtle: var(--color-status-danger-subtle);
+  --color-info: var(--color-status-info);
+  --color-info-subtle: var(--color-status-info-subtle);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+* {
+  border-color: var(--color-border-default);
+}
+
+body {
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+}
+
+/* design.md §47.2 — visible focus everywhere, no layout shift. */
+:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* design.md §47.2 — skip link, hidden until focused. */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -3rem;
+  z-index: 100;
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  transition: top var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* design.md §7 brand adoption — warm gradient reserved for genuinely
+   promotional surfaces (e.g. the Ask CTA), not persistent chrome. */
+.surface-gradient-brand {
+  background: linear-gradient(135deg, var(--color-action-primary), var(--orange-400));
+  color: var(--color-action-on-primary);
+}

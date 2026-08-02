@@ -1,0 +1,97 @@
+# Render Blueprint. docs/deployment.md walks through using this end to end.
+#
+# Three services, one shared env var group:
+#   - instamart-api            (web)  the FastAPI backend, always-on
+#   - instamart-daily-extraction (cron) scripts/daily_extraction.sh,
+#                                       00:30 UTC = 6:00 AM IST daily
+#   - instamart-redis          (key value) Render-native Redis-compatible
+#                                       store — /health pings it, and it's
+#                                       the ready-made broker if/when a real
+#                                       Celery task is ever added (none
+#                                       exist today — see core/celery_app.py)
+#
+# Both the web and cron services build from the SAME image
+# (backend/Dockerfile.prod, repo root as build context) so the cron job
+# never re-installs dependencies on its own — it reuses whatever was last
+# deployed for the API.
+#
+# Secrets (API keys, DATABASE_URL, SUPABASE_SERVICE_ROLE_KEY) are declared
+# with `sync: false` — Render will prompt for them in the dashboard the
+# first time you deploy this blueprint. Nothing sensitive is committed here.
+
+envVarGroups:
+  - name: instamart-shared
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: RAW_STORAGE_BACKEND
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        sync: false
+      - key: LLM_PROVIDER
+        value: groq
+      - key: LLM_FALLBACK_PROVIDER
+        value: openrouter
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: EMBEDDING_PROVIDER
+        value: hosted
+      - key: HF_API_TOKEN
+        sync: false
+      - key: APIFY_TOKEN
+        sync: false
+      - key: REDDIT_CLIENT_ID
+        sync: false
+      - key: REDDIT_CLIENT_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+
+services:
+  - type: web
+    name: instamart-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile.prod
+    dockerContext: .
+    plan: starter # free tier spins down on idle, which breaks a user-facing API — see docs/deployment.md
+    healthCheckPath: /health
+    envVarGroups:
+      - instamart-shared
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: instamart-redis
+          property: connectionString
+
+  - type: cron
+    name: instamart-daily-extraction
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile.prod
+    dockerContext: .
+    plan: free # invoked on schedule, not kept warm — free tier is fine here
+    schedule: "30 0 * * *" # 00:30 UTC = 6:00 AM IST
+    dockerCommand: bash scripts/daily_extraction.sh
+    envVarGroups:
+      - instamart-shared
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: instamart-redis
+          property: connectionString
+
+  - type: keyvalue
+    name: instamart-redis
+    plan: free
+    ipAllowList: []

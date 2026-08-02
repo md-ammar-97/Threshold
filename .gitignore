@@ -1,0 +1,47 @@
+# Environment
+.env
+.env.local
+*.env
+
+# Python
+backend/.venv/
+**/__pycache__/
+*.pyc
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/.mypy_cache/
+*.egg-info/
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# Data (raw/derived artifacts should not be committed)
+data/raw/*
+data/interim/*
+data/processed/*
+data/evaluation/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+!data/evaluation/.gitkeep
+!data/evaluation/README.md
+
+# Local FilesystemRawArtifactStorage output (backend/data/), created when
+# running ingest/pipeline scripts locally with the filesystem storage
+# backend instead of Supabase — never intentional repo content.
+backend/data/
+
+# Stray duplicate of frontend/public/fonts/basis-grotesque/ (docs/ is
+# markdown specs only) — a licensed commercial font, not repo content.
+docs/Basis Grotesque PRO Font Family/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+
+# Docker
+docker-compose.override.yml

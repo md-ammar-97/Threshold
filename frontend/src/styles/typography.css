@@ -1,0 +1,123 @@
+/*
+ * Typography — design.md §8. Font families plus the full type scale as
+ * utility classes (`.text-heading-xl`, `.text-body-md`, ...) so features
+ * never hand-roll a font-size/line-height/weight triple inline.
+ */
+
+:root {
+  --font-sans:
+    "Basis Grotesque Pro", "Geist Variable", system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono:
+    "Geist Mono", ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono",
+    monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
+}
+
+.text-display-lg {
+  font-size: 48px;
+  line-height: 54px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-display-md {
+  font-size: 40px;
+  line-height: 46px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-heading-xl {
+  font-size: 32px;
+  line-height: 38px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-heading-lg {
+  font-size: 26px;
+  line-height: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-heading-md {
+  font-size: 21px;
+  line-height: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-heading-sm {
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-body-lg {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 430;
+}
+
+.text-body-md {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 430;
+}
+
+.text-body-sm {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 430;
+}
+
+.text-label-lg {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 560;
+}
+
+.text-label-md {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 560;
+}
+
+.text-caption {
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 520;
+}
+
+.text-code-sm {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 450;
+}
+
+/* design.md §8.3 — narrative text stays readable; evidence excerpts (detail
+   views only) are allowed the wider 88ch measure. */
+.measure-narrative {
+  max-width: 72ch;
+}
+
+.measure-excerpt {
+  max-width: 88ch;
+}

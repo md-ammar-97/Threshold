@@ -1,0 +1,12 @@
+/*
+ * Print stylesheet — Phase 0 placeholder.
+ * Report export uses a dedicated print theme (design.md §33.5, §39.9,
+ * XFN-010) built out alongside the Report Builder in Phase 8.
+ */
+
+@media print {
+  nav,
+  [data-app-shell="true"] {
+    display: none !important;
+  }
+}

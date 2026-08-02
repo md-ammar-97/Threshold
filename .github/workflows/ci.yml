@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: instamart
+          POSTGRES_PASSWORD: instamart
+          POSTGRES_DB: instamart
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U instamart"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://instamart:instamart@localhost:5432/instamart
+      REDIS_URL: redis://localhost:6379/0
+      APP_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend
+        working-directory: backend
+        run: pip install -e ".[dev]"
+      - name: Lint (ruff)
+        working-directory: backend
+        run: ruff check src tests
+      - name: Type-check (mypy)
+        working-directory: backend
+        run: mypy src
+      - name: Migration check
+        working-directory: backend
+        run: alembic upgrade head
+      - name: P0 adversarial suite (ai_evals.md §62/§82)
+        working-directory: backend
+        run: pytest -q -m p0_adversarial
+      - name: Test (pytest)
+        working-directory: backend
+        run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend
+        working-directory: frontend
+        run: npm ci
+      - name: Lint (eslint)
+        working-directory: frontend
+        run: npm run lint
+      - name: Type-check (tsc)
+        working-directory: frontend
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: frontend
+        run: npm run build
