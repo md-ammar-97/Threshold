@@ -8,12 +8,12 @@ This is the phased guide for taking Instamart Discovery Engine from local Docker
 |---|---|---|
 | 0 | Repository readiness — config files, local verification, CI | ✅ **Done** |
 | 1 | Push to GitHub | ✅ **Done** — `https://github.com/md-ammar-97/Threshold`, `main`, CI green |
-| 2 | Supabase — database + storage | ⬜ **Not started** — needs your Supabase account |
+| 2 | Supabase — database + storage | ✅ **Done** — schema migrated, taxonomy seeded, storage bucket live |
 | 3 | Render — backend API + daily cron + Redis | ⬜ **Not started** — depends on Phase 2 |
 | 4 | Vercel — frontend | ⬜ **Not started** — depends on Phase 3 |
 | 5 | End-to-end verification | ⬜ **Not started** — depends on Phases 2–4 |
 
-**Next up: Phase 2 (Supabase).** Nothing past Phase 1 can be done without your own accounts and credentials on Supabase/Render/Vercel/Groq/etc. — those steps are written for you to run yourself.
+**Next up: Phase 3 (Render).** Needs your Render account plus `GROQ_API_KEY`/`OPENROUTER_API_KEY`/`HF_API_TOKEN`/`APIFY_TOKEN` in hand (all already in local `.env`, just need pasting into Render's dashboard) — that part has to happen in your browser, not here.
 
 ## Why this split (not "everything on Vercel")
 
@@ -75,9 +75,13 @@ Live at `https://github.com/md-ammar-97/Threshold`, branch `main`, CI passing on
 
 ---
 
-## Phase 2 — Supabase: database + storage ⬜ Not started
+## Phase 2 — Supabase: database + storage ✅ Done
 
-**You'll need to do this yourself** — it requires your own Supabase account and produces secrets that must never be pasted into this chat or committed to the repo.
+Project created, `vector`/`pgcrypto`/`pg_trgm`/`citext` extensions enabled (the first migration does this automatically via `CREATE EXTENSION IF NOT EXISTS`, no manual dashboard step needed), storage bucket (`raw-artifacts`) live, all 9 migrations applied (55 tables), taxonomy v3 seeded (9 dimensions, 235 labels). `DATABASE_URL`/`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_STORAGE_BUCKET` are in local `.env`, ready to copy into Render's dashboard in Phase 3.
+
+**Bug found and fixed along the way**: `alembic/env.py` crashed with `ValueError: invalid interpolation syntax` the first time this ran against the real Supabase URL — `config.set_main_option()` stores the URL via Python's `configparser`, which treats a literal `%` as its own interpolation syntax. A URL-encoded special character in the DB password (e.g. `%40` for a literal `@`) triggered it. Fixed by escaping `%` to `%%` before that call (configparser's own documented workaround) — this would otherwise have broken Render's deploy identically in Phase 3, since Render's env var UI stores the same password.
+
+The steps below are kept for reference / re-running if the project is ever rebuilt from scratch.
 
 1. Create a new Supabase project.
 2. **Database → Extensions**: enable `vector` (pgvector). This project's embeddings and every vector-backed table assume Postgres 16+ with pgvector, which Supabase provides.
@@ -110,7 +114,7 @@ Live at `https://github.com/md-ammar-97/Threshold`, branch `main`, CI passing on
    ```
    Without this, classification has nothing to classify against.
 
-**Exit criteria**: `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` all in hand; `alembic upgrade head` and the taxonomy seed both ran successfully against the Supabase database.
+**Exit criteria** (met): `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` all in hand; `alembic upgrade head` and the taxonomy seed both ran successfully against the Supabase database.
 
 ## Phase 3 — Render: backend API + daily cron + Redis ⬜ Not started
 
