@@ -28,13 +28,19 @@ def _client_for(handler) -> httpx.Client:
 
 
 def test_validate_config_rejects_empty_hashtags_list() -> None:
-    connector = InstagramApifyConnector(api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[])))
+    connector = InstagramApifyConnector(
+        api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[]))
+    )
     with pytest.raises(SourceConfigError):
-        connector.validate_config(SourceConfig(target_identifier="x", configuration={"hashtags": []}))
+        connector.validate_config(
+            SourceConfig(target_identifier="x", configuration={"hashtags": []})
+        )
 
 
 def test_build_actor_input_defaults_to_default_hashtags() -> None:
-    connector = InstagramApifyConnector(api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[])))
+    connector = InstagramApifyConnector(
+        api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[]))
+    )
     actor_input = connector._build_actor_input(SourceConfig(target_identifier="x"))
     assert actor_input["hashtags"] == DEFAULT_HASHTAGS
 
@@ -44,7 +50,9 @@ def test_collect_maps_post_fields() -> None:
         return httpx.Response(200, json=[SAMPLE_POST])
 
     connector = InstagramApifyConnector(api_token="tok", client=_client_for(handler))
-    request = CollectionRequest(config=SourceConfig(target_identifier="x", configuration={"hashtags": ["swiggyinstamart"]}))
+    request = CollectionRequest(
+        config=SourceConfig(target_identifier="x", configuration={"hashtags": ["swiggyinstamart"]})
+    )
 
     items = list(connector.collect(request))
 

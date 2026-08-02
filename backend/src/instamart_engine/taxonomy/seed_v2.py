@@ -68,7 +68,8 @@ TOPIC_MAIN = DimensionSeed(
         ),
         (
             "trust_and_transparency",
-            "Whether the platform's fees, pricing, availability, or offers were honestly represented.",
+            "Whether the platform's fees, pricing, availability, or offers were "
+            "honestly represented.",
         ),
         ("safety_and_hygiene", "Product or delivery safety, hygiene, and contamination concerns."),
         ("product_assortment", "The range and variety of products and brands offered."),
@@ -85,7 +86,8 @@ TOPIC_MAIN = DimensionSeed(
         ),
         (
             "social_media_engagement",
-            "Social-media interaction patterns not tied to a specific service complaint or compliment.",
+            "Social-media interaction patterns not tied to a specific service complaint "
+            "or compliment.",
         ),
     ),
 )
@@ -308,7 +310,11 @@ TOPIC_SUB_BY_PARENT: dict[str, list[LabelSeed]] = {
 
 def _schema_definition() -> dict[str, Any]:
     dimensions = [
-        {"key": dim.key, "cardinality": dim.cardinality.value, "labels": [label.key for label in dim.labels]}
+        {
+            "key": dim.key,
+            "cardinality": dim.cardinality.value,
+            "labels": [label.key for label in dim.labels],
+        }
         for dim in V1_DIMENSIONS
     ]
     dimensions.append(
@@ -395,7 +401,9 @@ async def load_taxonomy_v2(session: AsyncSession) -> TaxonomyVersion:
 
     sort_order = 0
     for dim_seed in V1_DIMENSIONS:
-        await _insert_dimension(session, version_id=version.id, dim_seed=dim_seed, sort_order=sort_order)
+        await _insert_dimension(
+            session, version_id=version.id, dim_seed=dim_seed, sort_order=sort_order
+        )
         sort_order += 1
 
     topic_main_label_ids = await _insert_dimension(

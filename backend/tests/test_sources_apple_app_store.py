@@ -79,7 +79,9 @@ def test_collect_resuming_terminal_checkpoint_returns_immediately() -> None:
     connector = AppleAppStoreConnector(client=_client_for(handler))
     request = CollectionRequest(
         config=SourceConfig(target_identifier="310633997"),
-        checkpoint=ConnectorCheckpoint(checkpoint_type="page_number", checkpoint_value={}, is_terminal=True),
+        checkpoint=ConnectorCheckpoint(
+            checkpoint_type="page_number", checkpoint_value={}, is_terminal=True
+        ),
     )
 
     items = list(connector.collect(request))

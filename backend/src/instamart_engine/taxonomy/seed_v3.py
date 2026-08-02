@@ -137,7 +137,11 @@ ALL_V3_DIMENSIONS: list[DimensionSeed] = [DISCOVERY_MECHANISM, EXPERIMENTATION_P
 
 def _schema_definition() -> dict[str, Any]:
     dimensions = [
-        {"key": dim.key, "cardinality": dim.cardinality.value, "labels": [label.key for label in dim.labels]}
+        {
+            "key": dim.key,
+            "cardinality": dim.cardinality.value,
+            "labels": [label.key for label in dim.labels],
+        }
         for dim in V1_DIMENSIONS
     ]
     dimensions.append(
@@ -158,7 +162,11 @@ def _schema_definition() -> dict[str, Any]:
     )
     for dim in ALL_V3_DIMENSIONS:
         dimensions.append(
-            {"key": dim.key, "cardinality": dim.cardinality.value, "labels": [label.key for label in dim.labels]}
+            {
+                "key": dim.key,
+                "cardinality": dim.cardinality.value,
+                "labels": [label.key for label in dim.labels],
+            }
         )
     return {"dimensions": dimensions}
 
@@ -227,7 +235,9 @@ async def load_taxonomy_v3(session: AsyncSession) -> TaxonomyVersion:
 
     sort_order = 0
     for dim_seed in V1_DIMENSIONS:
-        await _insert_dimension(session, version_id=version.id, dim_seed=dim_seed, sort_order=sort_order)
+        await _insert_dimension(
+            session, version_id=version.id, dim_seed=dim_seed, sort_order=sort_order
+        )
         sort_order += 1
 
     topic_main_label_ids = await _insert_dimension(
@@ -266,7 +276,9 @@ async def load_taxonomy_v3(session: AsyncSession) -> TaxonomyVersion:
     await session.flush()
 
     for dim_seed in ALL_V3_DIMENSIONS:
-        await _insert_dimension(session, version_id=version.id, dim_seed=dim_seed, sort_order=sort_order)
+        await _insert_dimension(
+            session, version_id=version.id, dim_seed=dim_seed, sort_order=sort_order
+        )
         sort_order += 1
 
     return version

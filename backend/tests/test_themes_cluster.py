@@ -242,7 +242,10 @@ async def test_small_dataset_uses_fallback_and_produces_no_themes(db_session) ->
     await db_session.flush()
 
     summary = await discover_themes(
-        db_session, analysis_run_id=analysis_run.id, source_connector_id=connector.id, provider="local"
+        db_session,
+        analysis_run_id=analysis_run.id,
+        source_connector_id=connector.id,
+        provider="local",
     )
 
     assert summary.eligible_record_count == 4

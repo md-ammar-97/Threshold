@@ -10,9 +10,8 @@ non-functional; swapped before writing this connector.
 """
 
 import hashlib
-from collections.abc import Iterator
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from instamart_engine.sources.apify_actor import ApifyActorConnector
 from instamart_engine.sources.base import RawSourceItem, SourceConfig
@@ -80,7 +79,7 @@ class TwitterApifyConnector(ApifyActorConnector):
         )
 
 
-def _extract_media(item: dict[str, Any]) -> tuple[str | None, str | None]:
+def _extract_media(item: dict[str, Any]) -> tuple[str | None, Literal["image", "video"] | None]:
     """Apify's docs confirm a top-level `media`/`extendedEntities` field
     exists on this actor's output but don't document the media object's
     internal shape — this follows the standard Twitter API v1.1 media-entity

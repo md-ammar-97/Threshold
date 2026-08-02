@@ -31,13 +31,19 @@ def _client_for(handler) -> httpx.Client:
 
 
 def test_validate_config_rejects_empty_search_terms_list() -> None:
-    connector = TwitterApifyConnector(api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[])))
+    connector = TwitterApifyConnector(
+        api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[]))
+    )
     with pytest.raises(SourceConfigError):
-        connector.validate_config(SourceConfig(target_identifier="x", configuration={"searchTerms": []}))
+        connector.validate_config(
+            SourceConfig(target_identifier="x", configuration={"searchTerms": []})
+        )
 
 
 def test_build_actor_input_defaults_to_shared_search_terms() -> None:
-    connector = TwitterApifyConnector(api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[])))
+    connector = TwitterApifyConnector(
+        api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[]))
+    )
     actor_input = connector._build_actor_input(SourceConfig(target_identifier="x"))
     assert actor_input["searchTerms"] == INSTAMART_SEARCH_TERMS
 
@@ -47,7 +53,11 @@ def test_collect_maps_tweet_fields() -> None:
         return httpx.Response(200, json=[SAMPLE_TWEET])
 
     connector = TwitterApifyConnector(api_token="tok", client=_client_for(handler))
-    request = CollectionRequest(config=SourceConfig(target_identifier="x", configuration={"searchTerms": ["Swiggy Instamart"]}))
+    request = CollectionRequest(
+        config=SourceConfig(
+            target_identifier="x", configuration={"searchTerms": ["Swiggy Instamart"]}
+        )
+    )
 
     items = list(connector.collect(request))
 

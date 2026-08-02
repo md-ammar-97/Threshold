@@ -374,7 +374,13 @@ async def classify_unclassified_records(
 
         # Topic classification failing never undoes the primary
         # classification above — it's logged and skipped, not raised.
-        if topic_dimensions and topic_user_prompt_with_taxonomy is not None:
+        if (
+            topic_dimensions
+            and topic_user_prompt_with_taxonomy is not None
+            and topic_prompt_version is not None
+            and topic_model_configuration is not None
+            and topic_output_model is not None
+        ):
             topic_user_prompt = topic_user_prompt_with_taxonomy.replace(
                 "{{UNTRUSTED_CONTENT}}", delimit_untrusted_content(record.redacted_text)
             )

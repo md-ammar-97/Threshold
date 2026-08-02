@@ -37,7 +37,9 @@ def test_constructor_rejects_missing_token() -> None:
 
 
 def test_actor_path_url_encodes_slash() -> None:
-    connector = _FakeActorConnector(api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[])))
+    connector = _FakeActorConnector(
+        api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[]))
+    )
     assert connector._actor_path() == "someuser~some-actor"
 
 
@@ -84,7 +86,9 @@ def test_collect_ignores_prior_terminal_checkpoint_and_collects_again() -> None:
     connector = _FakeActorConnector(api_token="tok", client=_client_for(handler))
     request = CollectionRequest(
         config=SourceConfig(target_identifier="query"),
-        checkpoint=ConnectorCheckpoint(checkpoint_type="apify_run", checkpoint_value={}, is_terminal=True),
+        checkpoint=ConnectorCheckpoint(
+            checkpoint_type="apify_run", checkpoint_value={}, is_terminal=True
+        ),
     )
 
     items = list(connector.collect(request))

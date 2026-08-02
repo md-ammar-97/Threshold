@@ -460,6 +460,9 @@ async def email_export(
             status_code=400, detail="only markdown exports can be emailed today"
         )
 
+    # A COMPLETED export always has a storage_key — finalize_export() only
+    # leaves it None on the failure path, guarded against above.
+    assert export.storage_key is not None
     rendered_content = _storage().read(export.storage_key).decode("utf-8")
     try:
         message_id = report_email.send_report_export_email(

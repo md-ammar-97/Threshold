@@ -6,9 +6,8 @@ feasible here, unlike Facebook (see `facebook.py`).
 """
 
 import hashlib
-from collections.abc import Iterator
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 from instamart_engine.sources.apify_actor import ApifyActorConnector
 from instamart_engine.sources.base import RawSourceItem, SourceConfig
@@ -54,7 +53,7 @@ class InstagramApifyConnector(ApifyActorConnector):
         video_url = item.get("videoUrl")
         display_url = item.get("displayUrl")
         media_url = video_url or display_url
-        media_type = None
+        media_type: Literal["image", "video"] | None = None
         if media_url:
             media_type = "video" if video_url else "image"
 

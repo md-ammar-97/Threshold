@@ -189,7 +189,7 @@ async def _build_theme_candidate_output(
         ),
         "member_count": len(memberships),
         "has_representative_evidence": any(m.is_representative for m in memberships),
-        "source_counts": dict(source_rows.all()),
+        "source_counts": {key: count for key, count in source_rows.all()},
     }
 
 

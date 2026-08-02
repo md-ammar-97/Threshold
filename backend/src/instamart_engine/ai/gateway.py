@@ -168,8 +168,8 @@ class AIGateway:
                         max_tokens=model_configuration.max_output_tokens or 2048,
                         messages=[
                             {"role": "system", "content": system_prompt},
-                            *messages,
-                        ],  # type: ignore[arg-type]
+                            *messages,  # type: ignore[list-item]
+                        ],
                         response_format=output_format,
                         temperature=(
                             float(model_configuration.temperature)

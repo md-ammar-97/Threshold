@@ -39,13 +39,19 @@ def _client_for(handler) -> httpx.Client:
 
 
 def test_validate_config_rejects_empty_searches_list() -> None:
-    connector = RedditApifyConnector(api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[])))
+    connector = RedditApifyConnector(
+        api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[]))
+    )
     with pytest.raises(SourceConfigError):
-        connector.validate_config(SourceConfig(target_identifier="x", configuration={"searches": []}))
+        connector.validate_config(
+            SourceConfig(target_identifier="x", configuration={"searches": []})
+        )
 
 
 def test_build_actor_input_defaults_to_shared_search_terms() -> None:
-    connector = RedditApifyConnector(api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[])))
+    connector = RedditApifyConnector(
+        api_token="tok", client=_client_for(lambda r: httpx.Response(200, json=[]))
+    )
     actor_input = connector._build_actor_input(SourceConfig(target_identifier="x"))
     assert actor_input["searches"] == INSTAMART_SEARCH_TERMS
     assert actor_input["searchPosts"] is True
@@ -57,7 +63,9 @@ def test_collect_maps_post_and_comment_with_parent_linkage() -> None:
         return httpx.Response(200, json=[SAMPLE_COMMENT, SAMPLE_POST])
 
     connector = RedditApifyConnector(api_token="tok", client=_client_for(handler))
-    request = CollectionRequest(config=SourceConfig(target_identifier="x", configuration={"searches": ["Instamart"]}))
+    request = CollectionRequest(
+        config=SourceConfig(target_identifier="x", configuration={"searches": ["Instamart"]})
+    )
 
     items = {item.record_type: item for item in connector.collect(request)}
 

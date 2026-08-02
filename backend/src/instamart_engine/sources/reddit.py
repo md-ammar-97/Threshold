@@ -8,9 +8,8 @@ against real sample output before writing this mapping.
 
 import hashlib
 import re
-from collections.abc import Iterator
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from instamart_engine.sources.apify_actor import ApifyActorConnector
 from instamart_engine.sources.base import RawSourceItem, SourceConfig
@@ -73,7 +72,9 @@ class RedditApifyConnector(ApifyActorConnector):
         media_url = (video_urls[0] if video_urls else None) or (
             image_urls[0] if image_urls else None
         )
-        media_type = "video" if video_urls else ("image" if image_urls else None)
+        media_type: Literal["image", "video"] | None = (
+            "video" if video_urls else ("image" if image_urls else None)
+        )
 
         return RawSourceItem(
             external_id=item["id"],

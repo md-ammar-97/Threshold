@@ -75,7 +75,9 @@ class SupabaseRawArtifactStorage:
     ):
         from instamart_engine.storage.base import StoredArtifact
 
-        max_bytes = MAX_ARTIFACT_BYTES if content_type == "application/json" else MAX_MEDIA_ARTIFACT_BYTES
+        max_bytes = (
+            MAX_ARTIFACT_BYTES if content_type == "application/json" else MAX_MEDIA_ARTIFACT_BYTES
+        )
         if len(content) > max_bytes:
             raise RawArtifactStorageError(
                 f"Artifact for {item_key!r} is {len(content)} bytes, "

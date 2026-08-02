@@ -96,8 +96,10 @@ async def get_insight(insight_id: UUID, session: DbSession) -> InsightDetailResp
     record_ids = [link.feedback_record_id for link in evidence_links]
     records_by_id: dict[UUID, FeedbackRecord] = {}
     if record_ids:
-        rows = await session.scalars(select(FeedbackRecord).where(FeedbackRecord.id.in_(record_ids)))
-        records_by_id = {record.id: record for record in rows.all()}
+        record_rows = await session.scalars(
+            select(FeedbackRecord).where(FeedbackRecord.id.in_(record_ids))
+        )
+        records_by_id = {record.id: record for record in record_rows.all()}
     source_keys = await _source_keys_for(session, list(records_by_id.values()))
 
     return InsightDetailResponse(
@@ -110,7 +112,9 @@ async def get_insight(insight_id: UUID, session: DbSession) -> InsightDetailResp
         themes=[
             InsightThemeLinkResponse(
                 theme_id=link.theme_id,
-                theme_name=themes_by_id[link.theme_id].name if link.theme_id in themes_by_id else "unknown",
+                theme_name=(
+                    themes_by_id[link.theme_id].name if link.theme_id in themes_by_id else "unknown"
+                ),
                 relationship_type=link.relationship_type.value,
             )
             for link in theme_links
@@ -125,14 +129,16 @@ async def get_insight(insight_id: UUID, session: DbSession) -> InsightDetailResp
                 ),
                 evidence_role=link.evidence_role.value,
                 source_connector_key=(
-                    source_keys.get(records_by_id[link.feedback_record_id].source_connector_id, "unknown")
+                    source_keys.get(
+                        records_by_id[link.feedback_record_id].source_connector_id, "unknown"
+                    )
                     if link.feedback_record_id in records_by_id
                     else "unknown"
                 ),
                 published_at=(
-                    records_by_id[link.feedback_record_id].published_at.isoformat()
-                    if link.feedback_record_id in records_by_id
-                    and records_by_id[link.feedback_record_id].published_at
+                    published_at.isoformat()
+                    if (record := records_by_id.get(link.feedback_record_id)) is not None
+                    and (published_at := record.published_at) is not None
                     else None
                 ),
             )

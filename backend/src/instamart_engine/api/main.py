@@ -33,7 +33,9 @@ logger = get_logger(__name__)
 
 def _reject_debug_in_production() -> None:
     """DEP-015 — production must not start with debug/local defaults."""
-    provider_key = settings.GROQ_API_KEY if settings.LLM_PROVIDER == "groq" else settings.OPENROUTER_API_KEY
+    provider_key = (
+        settings.GROQ_API_KEY if settings.LLM_PROVIDER == "groq" else settings.OPENROUTER_API_KEY
+    )
     if settings.is_production and provider_key is None:
         raise RuntimeError(
             f"Refusing to start: APP_ENV=production but no API key is set for "
