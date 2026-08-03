@@ -10,10 +10,10 @@ This is the phased guide for taking Instamart Discovery Engine from local Docker
 | 1 | Push to GitHub | ✅ **Done** — `https://github.com/md-ammar-97/Threshold`, `main`, CI green |
 | 2 | Supabase — database + storage | ✅ **Done** — schema migrated, taxonomy seeded, storage bucket live |
 | 3 | Render — backend API + daily cron + Redis | ✅ **Done** — `instamart-api` live, `/health` green; `instamart-daily-extraction` deployed |
-| 4 | Vercel — frontend | ⬜ **Not started** — depends on Phase 3 |
-| 5 | End-to-end verification | ⬜ **Not started** — depends on Phases 2–4 |
+| 4 | Vercel — frontend | ✅ **Done** — `https://instamart-discovery-engine.vercel.app`, CORS verified working end to end |
+| 5 | End-to-end verification | 🟡 **Partial** — health check and frontend↔backend connectivity confirmed; cron run and a real report export not yet done |
 
-**Next up: Phase 4 (Vercel).** Free Hobby tier, no card required — just import the repo and set one env var.
+**Next up: Phase 5.** Trigger a manual cron run to confirm the daily pipeline actually completes against the live stack, then create and export a report through the deployed frontend.
 
 ## Why this split (not "everything on Vercel")
 
@@ -141,16 +141,18 @@ Once `DATABASE_URL` was corrected, `https://<your-api>.onrender.com/health` retu
 
 **Exit criteria** (met): `https://<your-api>.onrender.com/health` returns `{"status": "ok", ...}`. Still pending: a manually-triggered cron run confirmed to complete (or clearly degrade gracefully under rate limits) — see Phase 5.
 
-## Phase 4 — Vercel: frontend ⬜ Not started
+## Phase 4 — Vercel: frontend ✅ Done
 
-Depends on Phase 3 for the live Render API URL.
+Live at `https://instamart-discovery-engine.vercel.app` (Hobby/free tier, no card required), linked to the GitHub repo with production branch `main` — auto-deploys on every push.
 
 1. Vercel dashboard → **Add New → Project**, import the GitHub repo.
-2. Set **Root Directory** to `frontend`. Vercel will auto-detect the Vite framework preset; `frontend/vercel.json` (committed in this repo) pins the build command (`npm run build`), output directory (`dist`), and adds a catch-all rewrite to `index.html` — required because this is a client-side-routed SPA (`react-router-dom`'s `BrowserRouter`); without the rewrite, refreshing on a deep link like `/themes/<id>` would 404.
-3. Add one environment variable: `VITE_API_URL` = your deployed Render API's public URL (e.g. `https://instamart-api.onrender.com`) — this is the *only* place the frontend reads a backend URL from (`frontend/src/lib/api/client.ts`), confirmed by grep across the whole `frontend/src` tree.
+2. Set **Root Directory** to `frontend`. Vercel auto-detects the Vite framework preset; `frontend/vercel.json` (committed in this repo) pins the build command (`npm run build`), output directory (`dist`), and adds a catch-all rewrite to `index.html` — required because this is a client-side-routed SPA (`react-router-dom`'s `BrowserRouter`); without the rewrite, refreshing on a deep link like `/themes/<id>` would 404. Verified live: `/themes` and `/validation` both return 200, not 404.
+3. Add one environment variable: `VITE_API_URL` = your deployed Render API's public URL (e.g. `https://instamart-api-v40x.onrender.com`) — this is the *only* place the frontend reads a backend URL from (`frontend/src/lib/api/client.ts`), confirmed by grep across the whole `frontend/src` tree.
 4. Deploy. Vercel will auto-redeploy on every push to `main` from here on.
 
-**Exit criteria**: Vercel URL loads the app shell (Themes/Insights/Validation pages render, even if empty pre-first-extraction).
+**Bug found and fixed along the way**: `backend/src/instamart_engine/api/main.py`'s CORS middleware had `allow_origins` hardcoded to `http://localhost:3000` only. Harmless in local dev, but would have silently broken every API call from the deployed frontend — browsers block cross-origin responses whose origin isn't in `Access-Control-Allow-Origin`, and the failure is invisible from the backend's own logs, only visible as failed `fetch()` calls in the browser's devtools console. Caught by testing the actual deployed frontend against the actual deployed backend before declaring this phase done, rather than trusting that both being "live" meant they could talk to each other. Fixed with a new `CORS_ORIGINS` setting (comma-separated, defaults to `http://localhost:3000` so local dev is unaffected) — see the env var reference below. Verified via a real preflight (`OPTIONS`) and `GET` request with `Origin: https://instamart-discovery-engine.vercel.app`, both returning the correct `Access-Control-Allow-Origin` header.
+
+**Exit criteria** (met): Vercel URL loads the app shell, deep-linked routes don't 404, and a real cross-origin request from the Vercel origin to the Render API succeeds with correct CORS headers.
 
 ## Phase 5 — End-to-end verification ⬜ Not started
 
@@ -177,6 +179,7 @@ Every field on `Settings` (`backend/src/instamart_engine/core/config.py`), group
 | `APP_ENV` | `local` | Set to `production` | Gates a startup check that refuses to boot with default/local-looking config in production |
 | `DATABASE_URL` | local Postgres | **Yes** | Supabase direct connection string, `+asyncpg` driver, port 5432 not 6543 |
 | `REDIS_URL` | local Redis | **Yes** | Injected automatically from the `instamart-redis` Render service if using `render.yaml` |
+| `CORS_ORIGINS` | `http://localhost:3000` | **Yes** | Comma-separated allowed frontend origins; must include your deployed Vercel URL(s) or every API call from the browser fails cross-origin |
 | `RAW_STORAGE_BACKEND` | `filesystem` | **Yes — set to `supabase`** | `filesystem` has no meaning on Render's ephemeral containers |
 | `RAW_STORAGE_PATH` | `./data/raw` | No | Only used by the filesystem backend |
 | `SUPABASE_URL` | — | **Yes** (if using Supabase storage) | Project URL |
