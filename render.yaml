@@ -42,6 +42,8 @@ envVarGroups:
         value: openrouter
       - key: GROQ_API_KEY
         sync: false
+      - key: GROQ_API_KEY_SECONDARY
+        sync: false # optional — a second Groq account's key, tried before OPENROUTER_API_KEY
       - key: OPENROUTER_API_KEY
         sync: false
       - key: EMBEDDING_PROVIDER

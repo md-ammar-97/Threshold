@@ -191,6 +191,7 @@ Every field on `Settings` (`backend/src/instamart_engine/core/config.py`), group
 | `LLM_FALLBACK_MODEL` | `nvidia/nemotron-3-super-120b-a12b:free` | No | OpenRouter model name |
 | `LLM_MODEL_TRANSCRIPTION` | `whisper-large-v3-turbo` | No | Groq-hosted Whisper, used by `extract_media.py` |
 | `GROQ_API_KEY` | — | **Yes** | Nothing classifies/synthesizes/answers without it |
+| `GROQ_API_KEY_SECONDARY` | — | Optional | A second Groq account's key, tried after the primary is rate-limited/quota-exhausted but before `OPENROUTER_API_KEY` — effectively doubles the free-tier daily/per-minute token budget. Only used when `LLM_PROVIDER=groq` |
 | `OPENROUTER_API_KEY` | — | Recommended | Fallback when Groq rate-limits or errors |
 | `EMBEDDING_PROVIDER` | `hosted` | No | `hosted` = Hugging Face Inference API (no torch download at runtime); `local` needs `HF_API_TOKEN` unset but downloads model weights into the container instead |
 | `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | No | |

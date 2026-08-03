@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     # pipeline speech-to-text (feedback/media_extraction.py).
     LLM_MODEL_TRANSCRIPTION: str = "whisper-large-v3-turbo"
     GROQ_API_KEY: str | None = None
+    # A second Groq account's key, tried after the primary is rate-limited/
+    # quota-exhausted but before falling over to LLM_FALLBACK_PROVIDER —
+    # doubles the effective free-tier daily/per-minute token budget without
+    # needing a paid Groq tier. Only used when LLM_PROVIDER=groq.
+    GROQ_API_KEY_SECONDARY: str | None = None
     OPENROUTER_API_KEY: str | None = None
 
     # Embeddings

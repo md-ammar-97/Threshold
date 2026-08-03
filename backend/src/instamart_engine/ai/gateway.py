@@ -67,6 +67,10 @@ def _build_client(provider: str, settings: Settings) -> openai.AsyncOpenAI:
     if not api_key:
         # MOD-012 — fail configuration checks before queuing paid work.
         raise ProviderConfigurationError(f"{provider.upper()}_API_KEY is not configured")
+    return _build_client_with_key(provider, api_key)
+
+
+def _build_client_with_key(provider: str, api_key: str) -> openai.AsyncOpenAI:
     return openai.AsyncOpenAI(api_key=api_key, base_url=_PROVIDER_BASE_URLS[provider])
 
 
@@ -75,6 +79,9 @@ class AIGateway:
         self,
         client: openai.AsyncOpenAI | None = None,
         *,
+        secondary_client: openai.AsyncOpenAI | None = None,
+        secondary_provider: str | None = None,
+        secondary_model: str | None = None,
         fallback_client: openai.AsyncOpenAI | None = None,
         fallback_provider: str | None = None,
         fallback_model: str | None = None,
@@ -82,6 +89,21 @@ class AIGateway:
         if client is None:
             settings = get_settings()
             client = _build_client(settings.LLM_PROVIDER, settings)
+            # A second account on the *same* provider — tried after the
+            # primary key is rate-limited/quota-exhausted but before falling
+            # over to a different provider/model entirely. Only meaningful
+            # when the primary provider is groq, since the whole point is
+            # "same provider, different account", not a different model.
+            if settings.LLM_PROVIDER == "groq" and settings.GROQ_API_KEY_SECONDARY:
+                secondary_client = _build_client_with_key(
+                    "groq", settings.GROQ_API_KEY_SECONDARY
+                )
+                secondary_provider = "groq-secondary"
+                # Left unset deliberately: the secondary tier is the *same*
+                # provider/model catalog as primary, just a different
+                # account's key, so call_structured() reuses whatever
+                # model_configuration.model_name the primary attempt used
+                # rather than a fixed value that could drift from it.
             if settings.LLM_FALLBACK_PROVIDER and settings.LLM_FALLBACK_PROVIDER != (
                 settings.LLM_PROVIDER
             ):
@@ -89,6 +111,9 @@ class AIGateway:
                 fallback_provider = settings.LLM_FALLBACK_PROVIDER
                 fallback_model = settings.LLM_FALLBACK_MODEL
         self._client = client
+        self._secondary_client = secondary_client
+        self._secondary_provider = secondary_provider or "secondary"
+        self._secondary_model = secondary_model
         self._fallback_client = fallback_client
         self._fallback_provider = fallback_provider or "fallback"
         self._fallback_model = fallback_model
@@ -143,6 +168,14 @@ class AIGateway:
                 model_name=model_configuration.model_name,
             )
         ]
+        if self._secondary_client is not None:
+            attempts.append(
+                _ProviderAttempt(
+                    name=self._secondary_provider,
+                    client=self._secondary_client,
+                    model_name=self._secondary_model or model_configuration.model_name,
+                )
+            )
         if self._fallback_client is not None and self._fallback_model:
             attempts.append(
                 _ProviderAttempt(

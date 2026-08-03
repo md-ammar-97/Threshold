@@ -251,6 +251,95 @@ async def test_primary_exhausted_fails_over_to_fallback_provider(db_session) -> 
     assert fallback_client.beta.chat.completions.parse.call_count == 1
 
 
+async def test_primary_exhausted_fails_over_to_secondary_groq_account(db_session) -> None:
+    """A second Groq account's key (GROQ_API_KEY_SECONDARY) is tried after
+    the primary key is rate-limited but before the fallback provider —
+    doubles the effective free-tier budget without a paid Groq tier."""
+    config = await _make_model_configuration(db_session, max_retries=1)
+    primary_client = AsyncMock()
+    primary_client.beta.chat.completions.parse = AsyncMock(side_effect=_rate_limit_error())
+    secondary_client = AsyncMock()
+    secondary_client.beta.chat.completions.parse = AsyncMock(
+        return_value=_FakeResponse(_Output(value="from-secondary"))
+    )
+    fallback_client = AsyncMock()
+    fallback_client.beta.chat.completions.parse = AsyncMock(
+        return_value=_FakeResponse(_Output(value="from-fallback"))
+    )
+    gateway = AIGateway(
+        client=primary_client,
+        secondary_client=secondary_client,
+        secondary_provider="groq-secondary",
+        fallback_client=fallback_client,
+        fallback_provider="openrouter",
+        fallback_model="fallback-test-model",
+    )
+
+    parsed, call = await gateway.call_structured(
+        db_session,
+        prompt_version_id=uuid.uuid4(),
+        prompt_version_key="v1",
+        system_prompt="system",
+        user_prompt="user",
+        model_configuration=config,
+        output_format=_Output,
+        task_type="classification",
+    )
+
+    assert parsed.value == "from-secondary"
+    assert call.status == ModelCallStatus.SUCCEEDED
+    assert call.raw_response["provider"] == "groq-secondary"
+    # The secondary attempt reuses the primary's model_name since it's the
+    # same provider/model catalog, just a different account's key.
+    secondary_client.beta.chat.completions.parse.assert_called_once()
+    assert (
+        secondary_client.beta.chat.completions.parse.call_args.kwargs["model"]
+        == config.model_name
+    )
+    assert fallback_client.beta.chat.completions.parse.call_count == 0
+
+
+async def test_secondary_and_primary_exhausted_fails_over_to_fallback_provider(
+    db_session,
+) -> None:
+    """The full three-tier chain: primary Groq account exhausted, secondary
+    Groq account also exhausted, OpenRouter (fallback) succeeds."""
+    config = await _make_model_configuration(db_session, max_retries=0)
+    primary_client = AsyncMock()
+    primary_client.beta.chat.completions.parse = AsyncMock(side_effect=_rate_limit_error())
+    secondary_client = AsyncMock()
+    secondary_client.beta.chat.completions.parse = AsyncMock(side_effect=_rate_limit_error())
+    fallback_client = AsyncMock()
+    fallback_client.beta.chat.completions.parse = AsyncMock(
+        return_value=_FakeResponse(_Output(value="from-fallback"))
+    )
+    gateway = AIGateway(
+        client=primary_client,
+        secondary_client=secondary_client,
+        secondary_provider="groq-secondary",
+        fallback_client=fallback_client,
+        fallback_provider="openrouter",
+        fallback_model="fallback-test-model",
+    )
+
+    parsed, call = await gateway.call_structured(
+        db_session,
+        prompt_version_id=uuid.uuid4(),
+        prompt_version_key="v1",
+        system_prompt="system",
+        user_prompt="user",
+        model_configuration=config,
+        output_format=_Output,
+        task_type="classification",
+    )
+
+    assert parsed.value == "from-fallback"
+    assert call.raw_response["provider"] == "openrouter"
+    assert primary_client.beta.chat.completions.parse.call_count == 1
+    assert secondary_client.beta.chat.completions.parse.call_count == 1
+    assert fallback_client.beta.chat.completions.parse.call_count == 1
+
+
 async def test_both_providers_exhausted_raises_model_unavailable(db_session) -> None:
     config = await _make_model_configuration(db_session, max_retries=0)
     primary_client = AsyncMock()
