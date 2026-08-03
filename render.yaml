@@ -79,7 +79,7 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile.prod
     dockerContext: .
-    plan: free # invoked on schedule, not kept warm — free tier is fine here
+    plan: starter # Render cron jobs don't support the free plan at all (verified via the API — only starter and up are valid), unlike web/keyvalue services
     schedule: "30 0 * * *" # 00:30 UTC = 6:00 AM IST
     dockerCommand: bash scripts/daily_extraction.sh
     envVarGroups:

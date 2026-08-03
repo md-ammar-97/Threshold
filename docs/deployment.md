@@ -9,11 +9,11 @@ This is the phased guide for taking Instamart Discovery Engine from local Docker
 | 0 | Repository readiness — config files, local verification, CI | ✅ **Done** |
 | 1 | Push to GitHub | ✅ **Done** — `https://github.com/md-ammar-97/Threshold`, `main`, CI green |
 | 2 | Supabase — database + storage | ✅ **Done** — schema migrated, taxonomy seeded, storage bucket live |
-| 3 | Render — backend API + daily cron + Redis | ⬜ **Not started** — depends on Phase 2 |
+| 3 | Render — backend API + daily cron + Redis | ✅ **Done** — `instamart-api` live, `/health` green; `instamart-daily-extraction` deployed |
 | 4 | Vercel — frontend | ⬜ **Not started** — depends on Phase 3 |
 | 5 | End-to-end verification | ⬜ **Not started** — depends on Phases 2–4 |
 
-**Next up: Phase 3 (Render).** Needs your Render account plus `GROQ_API_KEY`/`OPENROUTER_API_KEY`/`HF_API_TOKEN`/`APIFY_TOKEN` in hand (all already in local `.env`, just need pasting into Render's dashboard) — that part has to happen in your browser, not here.
+**Next up: Phase 4 (Vercel).** Free Hobby tier, no card required — just import the repo and set one env var.
 
 ## Why this split (not "everything on Vercel")
 
@@ -85,17 +85,17 @@ The steps below are kept for reference / re-running if the project is ever rebui
 
 1. Create a new Supabase project.
 2. **Database → Extensions**: enable `vector` (pgvector). This project's embeddings and every vector-backed table assume Postgres 16+ with pgvector, which Supabase provides.
-3. **Database → Connection string**: copy the **direct** connection (port `5432`), not the pooled/PgBouncer one (port `6543`). `asyncpg` (this app's driver) doesn't speak PgBouncer's transaction-pooling mode cleanly without extra tuning that isn't configured here — use the direct connection to avoid that entirely. Rewrite it to this app's driver prefix:
+3. **Database → Connection string → "Session pooler" tab.** Not "Direct connection" and not "Transaction pooler" — both are wrong for different reasons: the **direct** connection (`db.<project-ref>.supabase.co:5432`) is **IPv6-only by default** (Supabase doesn't include a free IPv4 address), and most cloud hosts including Render only support outbound IPv4 — confirmed live: it worked from a local machine with IPv6 but the deployed Render service couldn't reach it at all. The **transaction pooler** (port `6543`) breaks `asyncpg`'s prepared-statement caching. The **session pooler** (port `5432`, host `aws-<n>-<region>.pooler.supabase.com`) is IPv4-native and behaves like a normal persistent connection, so it works cleanly with `asyncpg`. Rewrite it to this app's driver prefix:
    ```
-   postgresql+asyncpg://postgres:<password>@<project-ref>.supabase.co:5432/postgres
+   postgresql+asyncpg://postgres.<project-ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres
    ```
-   This is your `DATABASE_URL`.
+   This is your `DATABASE_URL`. Note the username changes to `postgres.<project-ref>` (not just `postgres`) for pooler connections.
 4. **Storage → New bucket**: create one (e.g. `instamart-raw`), any visibility (the app only ever accesses it server-side via the service_role key, never a public URL). This is your `SUPABASE_STORAGE_BUCKET`.
 5. **Project Settings → API**: copy the **Project URL** (`SUPABASE_URL`) and the **`service_role` secret key** (`SUPABASE_SERVICE_ROLE_KEY`) — not the `anon`/public key. The service_role key is required because `storage/supabase.py` writes objects server-side.
 6. Run migrations against this database from your local machine (needs the local `backend/.venv` set up per `backend/README.md`):
    ```bash
    cd backend
-   DATABASE_URL="postgresql+asyncpg://postgres:<password>@<project-ref>.supabase.co:5432/postgres" \
+   DATABASE_URL="postgresql+asyncpg://postgres.<project-ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres" \
      ./.venv/Scripts/python.exe -m alembic upgrade head
    ```
    (`alembic.ini`'s `sqlalchemy.url` is a placeholder — `alembic/env.py` always overrides it from `DATABASE_URL` at runtime, so this is the only thing you need to set.)
@@ -120,17 +120,26 @@ The steps below are kept for reference / re-running if the project is ever rebui
 
 Depends on Phase 2 for `DATABASE_URL`/`SUPABASE_*`. Also needs `GROQ_API_KEY` (console.groq.com), `OPENROUTER_API_KEY` (openrouter.ai), `HF_API_TOKEN` (huggingface.co), `APIFY_TOKEN` (apify.com), and optionally `RESEND_API_KEY`/`RESEND_FROM_EMAIL` (resend.com) in hand.
 
-This repo ships a `render.yaml` Blueprint at the repo root defining all three Render resources (`instamart-api`, `instamart-daily-extraction`, `instamart-redis`) from one file.
+This repo ships a `render.yaml` Blueprint at the repo root defining all three Render resources (`instamart-api`, `instamart-daily-extraction`, `instamart-redis`) from one file — in practice, the Blueprint dashboard flow failed to create anything (see below), so both services were created directly via Render's REST API instead. `render.yaml` stays as accurate reference/documentation and would work for a from-scratch rebuild via the dashboard, with two corrections noted below.
+
+**What actually happened, and what it revealed:**
+
+1. **Billing is required before creating any paid-plan resource** — the Blueprint apply failed silently (no error surfaced clearly in the UI) because the account had no card on file and `instamart-api` needs the `starter` plan (Render's free web-service tier spins down after 15 minutes idle, which breaks a user-facing API with a slow cold-start on the next request). Adding a card at https://dashboard.render.com/billing resolved this.
+2. **`render.yaml`'s `plan: free` for the cron job is invalid** — Render's cron jobs don't support a free plan at all (confirmed via the API: valid plans are `starter` and up). This means the Blueprint as originally written could never have deployed successfully even with billing set up. `instamart-daily-extraction` runs on `starter` too.
+3. **Render's account-wide limit of one free-tier Key Value instance** — if you already have another free Redis/Key Value instance on the account (from an unrelated project), you'll either need a paid plan for a second one, or reuse the existing instance. This project reuses an existing free instance from another project via its internal connection string (`redis://<instance-id>:6379`) rather than provisioning a dedicated one.
+4. **Supabase's direct database connection is IPv6-only by default**, and Render (like most cloud hosts) only supports outbound IPv4 — `DATABASE_URL` using the direct connection (`db.<ref>.supabase.co:5432`) worked fine locally but `/health` reported `"database": "unavailable"` once deployed. Fixed by switching to Supabase's **Session Pooler** connection string instead (see Phase 2's corrected step 3) — IPv4-native and, unlike the Transaction Pooler, doesn't break `asyncpg`'s prepared-statement caching.
+
+Once `DATABASE_URL` was corrected, `https://<your-api>.onrender.com/health` returned `{"status": "ok", "checks": {"database": "ok", "redis": "ok"}}`.
+
+**Reference — the dashboard Blueprint flow**, for a from-scratch rebuild (apply the two corrections above first: add billing before deploying, and use the Session Pooler connection string):
 
 1. Render dashboard → **New → Blueprint**, connect the GitHub repo, select `render.yaml`.
 2. Render will prompt for every env var marked `sync: false` in the blueprint — fill in `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `HF_API_TOKEN`, `APIFY_TOKEN`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (these live in one shared `envVarGroup`, so you only enter them once for both the API and the cron job).
-3. Deploy. **The first build takes a few minutes** — see Phase 0's note on the CPU-only PyTorch build. Subsequent deploys reuse Docker layer caching and are much faster unless `backend/pyproject.toml` changes.
-4. Once live, confirm `https://<your-api>.onrender.com/health` returns `{"status": "ok", ...}`.
-5. **Plan note**: `instamart-api` is set to Render's `starter` plan in `render.yaml`, not `free` — Render's free web-service tier spins down after 15 minutes of inactivity, which would mean the first request after any quiet period gets a slow cold-start (or times out from the frontend's perspective). `instamart-daily-extraction` is fine on `free` since it's only invoked on its schedule, never expected to stay warm.
-6. The cron job's schedule is `30 0 * * *` — Render Cron Jobs use standard cron syntax in **UTC**. `00:30 UTC = 6:00 AM IST` (IST is UTC+5:30 — a 30-minute offset, not a clean hour shift, easy to get wrong). You can trigger a manual run from the Render dashboard (cron service → "Trigger Run") to test it without waiting for the schedule, and check past runs' logs the same way.
-7. **Groq free-tier rate limits will govern how long the cron job actually takes.** Verified live during development: Groq's `on_demand` tier caps `openai/gpt-oss-120b` at 8,000 tokens/minute *and* 200,000 tokens/day. The classify/synthesize step in `scripts/pipeline.py` retries transient 429s automatically and fails over to `OPENROUTER_API_KEY` (`LLM_FALLBACK_PROVIDER`) once Groq's per-call retries are exhausted, so a rate-limited run degrades gracefully rather than crashing — but on a heavy ingestion day (100s of new records), the daily job can genuinely take well over an hour to finish classifying everything, and if the *daily* Groq quota is already exhausted (e.g. from manual testing earlier that day), most calls will fail over to the fallback model for the rest of the day. If this matters for your volume, upgrade the Groq org to a paid tier before relying on the daily cron.
+3. Deploy. **The first build takes a few minutes** — see Phase 0's note on the CPU-only PyTorch build (in practice, Render's build infra finished it in ~2.5 minutes, faster than local). Subsequent deploys reuse Docker layer caching and are much faster unless `backend/pyproject.toml` changes.
+4. The cron job's schedule is `30 0 * * *` — Render Cron Jobs use standard cron syntax in **UTC**. `00:30 UTC = 6:00 AM IST` (IST is UTC+5:30 — a 30-minute offset, not a clean hour shift, easy to get wrong). You can trigger a manual run from the Render dashboard (cron service → "Trigger Run") to test it without waiting for the schedule, and check past runs' logs the same way.
+5. **Groq free-tier rate limits will govern how long the cron job actually takes.** Verified live during development: Groq's `on_demand` tier caps `openai/gpt-oss-120b` at 8,000 tokens/minute *and* 200,000 tokens/day. The classify/synthesize step in `scripts/pipeline.py` retries transient 429s automatically and fails over to `OPENROUTER_API_KEY` (`LLM_FALLBACK_PROVIDER`) once Groq's per-call retries are exhausted, so a rate-limited run degrades gracefully rather than crashing — but on a heavy ingestion day (100s of new records), the daily job can genuinely take well over an hour to finish classifying everything, and if the *daily* Groq quota is already exhausted (e.g. from manual testing earlier that day), most calls will fail over to the fallback model for the rest of the day. If this matters for your volume, upgrade the Groq org to a paid tier before relying on the daily cron.
 
-**Exit criteria**: `https://<your-api>.onrender.com/health` returns `{"status": "ok", ...}`; a manually-triggered cron run completes (or clearly degrades gracefully under rate limits, per point 7).
+**Exit criteria** (met): `https://<your-api>.onrender.com/health` returns `{"status": "ok", ...}`. Still pending: a manually-triggered cron run confirmed to complete (or clearly degrade gracefully under rate limits) — see Phase 5.
 
 ## Phase 4 — Vercel: frontend ⬜ Not started
 
