@@ -82,6 +82,9 @@ class AIGateway:
         secondary_client: openai.AsyncOpenAI | None = None,
         secondary_provider: str | None = None,
         secondary_model: str | None = None,
+        tertiary_client: openai.AsyncOpenAI | None = None,
+        tertiary_provider: str | None = None,
+        tertiary_model: str | None = None,
         fallback_client: openai.AsyncOpenAI | None = None,
         fallback_provider: str | None = None,
         fallback_model: str | None = None,
@@ -104,6 +107,11 @@ class AIGateway:
                 # account's key, so call_structured() reuses whatever
                 # model_configuration.model_name the primary attempt used
                 # rather than a fixed value that could drift from it.
+            if settings.LLM_PROVIDER == "groq" and settings.GROQ_API_KEY_TERTIARY:
+                tertiary_client = _build_client_with_key(
+                    "groq", settings.GROQ_API_KEY_TERTIARY
+                )
+                tertiary_provider = "groq-tertiary"
             if settings.LLM_FALLBACK_PROVIDER and settings.LLM_FALLBACK_PROVIDER != (
                 settings.LLM_PROVIDER
             ):
@@ -114,6 +122,9 @@ class AIGateway:
         self._secondary_client = secondary_client
         self._secondary_provider = secondary_provider or "secondary"
         self._secondary_model = secondary_model
+        self._tertiary_client = tertiary_client
+        self._tertiary_provider = tertiary_provider or "tertiary"
+        self._tertiary_model = tertiary_model
         self._fallback_client = fallback_client
         self._fallback_provider = fallback_provider or "fallback"
         self._fallback_model = fallback_model
@@ -174,6 +185,14 @@ class AIGateway:
                     name=self._secondary_provider,
                     client=self._secondary_client,
                     model_name=self._secondary_model or model_configuration.model_name,
+                )
+            )
+        if self._tertiary_client is not None:
+            attempts.append(
+                _ProviderAttempt(
+                    name=self._tertiary_provider,
+                    client=self._tertiary_client,
+                    model_name=self._tertiary_model or model_configuration.model_name,
                 )
             )
         if self._fallback_client is not None and self._fallback_model:

@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     # doubles the effective free-tier daily/per-minute token budget without
     # needing a paid Groq tier. Only used when LLM_PROVIDER=groq.
     GROQ_API_KEY_SECONDARY: str | None = None
+    # A third Groq account's key, tried after both the primary and secondary
+    # accounts are exhausted but before falling over to LLM_FALLBACK_PROVIDER.
+    # Only used when LLM_PROVIDER=groq.
+    GROQ_API_KEY_TERTIARY: str | None = None
     OPENROUTER_API_KEY: str | None = None
 
     # Embeddings
