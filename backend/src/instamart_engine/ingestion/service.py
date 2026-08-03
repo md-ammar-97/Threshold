@@ -34,6 +34,15 @@ from instamart_engine.storage.base import RawArtifactStorage
 
 logger = get_logger(__name__)
 
+# Connectors ultimately make raw HTTP calls (google_play_scraper's urlopen(),
+# in particular, is called with no timeout at all — confirmed via its source)
+# and a cloud host's IP can get silently black-holed by a target service
+# (observed live: google_play hung indefinitely from Render, worked instantly
+# from a residential IP) with no error, ever. Without a hard ceiling here,
+# one connector hanging blocks the whole daily cron job forever, burning
+# paid compute with no way to recover except manual cancellation.
+CONNECTOR_COLLECTION_TIMEOUT_SECONDS = 300
+
 
 def _collect_safely(
     connector: SourceConnector, request: CollectionRequest
@@ -157,12 +166,29 @@ async def run_ingestion(
     connector_row_id = connector_row.id
 
     request = CollectionRequest(config=source_config, checkpoint=checkpoint)
-    results = await asyncio.to_thread(_collect_safely, connector, request)
-
     discovered = 0
     stored = 0
     failed = 0
     trailing_error: Exception | None = None
+
+    try:
+        results = await asyncio.wait_for(
+            asyncio.to_thread(_collect_safely, connector, request),
+            timeout=CONNECTOR_COLLECTION_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as exc:
+        # The worker thread itself can't be killed (Python threads aren't
+        # cancellable) — it keeps running until the process exits, but the
+        # cron job's own container teardown handles that. What matters here
+        # is that the script doesn't hang forever: log this source as a
+        # total failure and let the caller move on to the next one.
+        logger.warning(
+            "connector_collection_timed_out",
+            connector_key=connector_key,
+            timeout_seconds=CONNECTOR_COLLECTION_TIMEOUT_SECONDS,
+        )
+        results = []
+        trailing_error = exc
 
     for item, error in results:
         if error is not None:

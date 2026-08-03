@@ -5,6 +5,7 @@ change is rolled back after each test). Network calls are mocked; only the
 ingestion service's own DB/storage orchestration is under test.
 """
 
+import time
 from datetime import datetime
 from unittest.mock import patch
 
@@ -13,6 +14,7 @@ import pytest
 from google_play_scraper.features.reviews import _ContinuationToken
 from sqlalchemy import select
 
+from instamart_engine.ingestion import service as ingestion_service
 from instamart_engine.ingestion.models import (
     ConnectorCheckpointModel,
     IngestionRunStatus,
@@ -20,7 +22,7 @@ from instamart_engine.ingestion.models import (
     RawSourceItem,
 )
 from instamart_engine.ingestion.service import run_ingestion
-from instamart_engine.sources.base import SourceConfig
+from instamart_engine.sources.base import CollectionRequest, ConnectorCheckpoint, SourceConfig
 from instamart_engine.sources.google_play import GooglePlayConnector
 from instamart_engine.sources.models import ConnectorType
 from instamart_engine.sources.public_web import PublicWebConnector
@@ -184,6 +186,53 @@ async def test_run_ingestion_survives_duplicate_item_within_same_run(
     assert run.records_stored == 1
     assert run.records_failed == 1
     assert run.status == IngestionRunStatus.PARTIALLY_COMPLETED
+
+
+class _HangingConnector:
+    """Simulates a connector whose underlying HTTP call never returns —
+    e.g. google_play_scraper's urlopen(), which has no timeout at all and
+    was observed live to hang indefinitely against a cloud host's IP."""
+
+    def validate_config(self, config: SourceConfig) -> None:
+        return None
+
+    def collect(self, request: CollectionRequest):
+        time.sleep(10)
+        yield from ()
+
+    def checkpoint(self) -> ConnectorCheckpoint | None:
+        return None
+
+
+async def test_run_ingestion_times_out_a_hanging_connector_instead_of_blocking_forever(
+    db_session, tmp_path, monkeypatch
+) -> None:
+    """Regression test for a live incident: google_play hung indefinitely
+    against Render's datacenter IP (no error, no timeout, nothing) and the
+    whole daily cron job blocked forever until manually canceled, burning
+    paid compute the entire time. A hard ceiling at the orchestration layer
+    means one connector hanging degrades to a logged failure, not an
+    unbounded hang — regardless of which connector or why it hung."""
+    monkeypatch.setattr(ingestion_service, "CONNECTOR_COLLECTION_TIMEOUT_SECONDS", 0.2)
+    storage = FilesystemRawArtifactStorage(str(tmp_path))
+
+    run = await run_ingestion(
+        db_session,
+        connector=_HangingConnector(),
+        connector_type=ConnectorType.LIBRARY,
+        connector_key="hanging_source",
+        connector_display_name="Hanging Source",
+        connector_version="test-1",
+        config_name="hanging-source-config",
+        source_config=SourceConfig(target_identifier="x"),
+        storage=storage,
+    )
+
+    assert run.records_discovered == 0
+    assert run.records_stored == 0
+    assert run.records_failed == 1
+    assert run.status == IngestionRunStatus.FAILED
+    assert run.failure_code == "TimeoutError"
 
 
 async def test_run_ingestion_preserves_partial_success_on_mid_stream_failure(
