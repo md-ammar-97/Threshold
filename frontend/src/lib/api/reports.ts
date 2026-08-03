@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { apiClient } from "@/lib/api/client";
+import { API_BASE_URL, apiClient } from "@/lib/api/client";
 
 export interface ReportEvidenceLink {
   id: string;
@@ -182,11 +182,15 @@ export function useRemoveEvidence(reportId: string) {
 
 export function useCreateExport(reportId: string) {
   return useMutation({
-    mutationFn: (exportFormat: "markdown" | "json") =>
+    mutationFn: (exportFormat: "markdown" | "json" | "pdf") =>
       apiClient.post<ReportExport>(`/api/v1/reports/${reportId}/exports`, {
         export_format: exportFormat,
       }),
   });
+}
+
+export function exportDownloadUrl(reportId: string, exportId: string): string {
+  return `${API_BASE_URL}/api/v1/reports/${reportId}/exports/${exportId}/download`;
 }
 
 export interface EmailExportResult {

@@ -45,7 +45,11 @@ def _fake_export(
 
 
 def test_send_report_export_email_raises_when_not_configured(monkeypatch) -> None:
-    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    # An OS-level empty string, not delenv: pydantic-settings still reads
+    # RESEND_API_KEY from the .env file (which has a real key outside
+    # tests) unless an explicit env var shadows it — delenv alone wouldn't
+    # actually unset it.
+    monkeypatch.setenv("RESEND_API_KEY", "")
     get_settings.cache_clear()
     try:
         with pytest.raises(report_email.EmailNotConfiguredError):

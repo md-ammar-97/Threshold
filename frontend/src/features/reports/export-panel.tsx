@@ -1,15 +1,20 @@
 import { useState } from "react";
-import { Mail } from "lucide-react";
+import { Download, Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { WarningBanner } from "@/components/research/warning-banner";
 import { ApiError } from "@/lib/api/client";
-import { type ReportExport, useCreateExport, useEmailExport } from "@/lib/api/reports";
+import {
+  exportDownloadUrl,
+  type ReportExport,
+  useCreateExport,
+  useEmailExport,
+} from "@/lib/api/reports";
 
-/** design.md §33.5 export preview — Markdown and JSON only (matching the
- * backend, which documents PDF as a deferred, not-yet-renderable format).
+/** design.md §33.5 export preview — Markdown, JSON, and PDF. PDF is binary,
+ * so it has no inline preview and is offered as a download link instead.
  * "Email this report" only appears for a completed Markdown export — the
  * backend only supports emailing that format today. */
 export function ExportPanel({ reportId }: { reportId: string }) {
@@ -18,7 +23,7 @@ export function ExportPanel({ reportId }: { reportId: string }) {
   const [recipientEmail, setRecipientEmail] = useState("");
   const emailExport = useEmailExport(reportId, lastExport?.id ?? null);
 
-  const runExport = (format: "markdown" | "json") => {
+  const runExport = (format: "markdown" | "json" | "pdf") => {
     createExport.mutate(format, { onSuccess: (result) => setLastExport(result) });
   };
 
@@ -56,6 +61,14 @@ export function ExportPanel({ reportId }: { reportId: string }) {
         >
           JSON
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => runExport("pdf")}
+          loading={createExport.isPending}
+        >
+          PDF
+        </Button>
       </div>
 
       {createExport.isError ? (
@@ -76,6 +89,17 @@ export function ExportPanel({ reportId }: { reportId: string }) {
         <pre className="text-body-sm max-h-96 overflow-auto rounded-[var(--radius-md)] bg-[var(--color-bg-surface-subtle)] p-3">
           {previewText}
         </pre>
+      ) : null}
+
+      {lastExport?.status === "completed" && lastExport.export_format === "pdf" ? (
+        <a
+          href={exportDownloadUrl(reportId, lastExport.id)}
+          download
+          className="text-body-sm inline-flex items-center gap-1.5 self-start text-[var(--color-text-link)] underline"
+        >
+          <Icon icon={Download} size="dense" aria-hidden />
+          Download PDF
+        </a>
       ) : null}
 
       {canEmail ? (

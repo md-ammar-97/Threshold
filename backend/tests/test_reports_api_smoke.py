@@ -63,7 +63,12 @@ async def _seed_minimal_theme_set() -> tuple[uuid.UUID, uuid.UUID]:
         await engine.dispose()
 
 
-def test_report_builder_end_to_end() -> None:
+def test_report_builder_end_to_end(monkeypatch) -> None:
+    # Deterministic regardless of whether the real environment has a live
+    # RESEND_API_KEY configured (it does outside tests) — this assertion is
+    # specifically about the "not configured" path.
+    monkeypatch.setattr(get_settings(), "RESEND_API_KEY", None)
+
     database_module._engine = None
     database_module._session_factory = None
     analysis_run_id, theme_set_id = asyncio.run(_seed_minimal_theme_set())
@@ -155,7 +160,17 @@ def test_report_builder_end_to_end() -> None:
         pdf_export_response = client.post(
             f"/api/v1/reports/{report_id}/exports", json={"export_format": "pdf"}
         )
-        assert pdf_export_response.status_code == 400  # documented, deferred format
+        assert pdf_export_response.status_code == 201, pdf_export_response.text
+        pdf_export = pdf_export_response.json()
+        assert pdf_export["status"] == "completed"
+        assert pdf_export["content"] is None  # binary — fetched via /download, not inline
+
+        pdf_download_response = client.get(
+            f"/api/v1/reports/{report_id}/exports/{pdf_export['id']}/download"
+        )
+        assert pdf_download_response.status_code == 200
+        assert pdf_download_response.headers["content-type"] == "application/pdf"
+        assert pdf_download_response.content.startswith(b"%PDF-")
 
         delete_response = client.delete(f"/api/v1/reports/{report_id}/sections/{section_id}")
         assert delete_response.status_code == 204

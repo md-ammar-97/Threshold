@@ -195,11 +195,11 @@ report_export_status_enum = Enum(
 
 
 class ReportExport(UUIDPrimaryKeyMixin, Base):
-    """datamodel.md §56 — an export job and its generated artifact. Only
-    `markdown`/`json` are actually renderable today (see `reports/export.py`)
-    — `pdf` is a documented, deferred `ReportExportFormat` member, not
-    silently unsupported: datamodel.md itself says "support only Markdown
-    and JSON report export initially, with PDF added later"."""
+    """datamodel.md §56 — an export job and its generated artifact.
+    `markdown`, `json`, and `pdf` are all renderable (see
+    `reports/export.py`); PDF is binary and served via the dedicated
+    `/exports/{id}/download` endpoint rather than inline in the export
+    response body."""
 
     __tablename__ = "report_export"
 

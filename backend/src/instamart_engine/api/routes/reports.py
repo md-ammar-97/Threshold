@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from instamart_engine.api.schemas.reports import (
@@ -52,7 +52,17 @@ router = APIRouter(prefix="/api/v1/reports", tags=["reports"])
 
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 
-_RENDERABLE_FORMATS = {ReportExportFormat.MARKDOWN, ReportExportFormat.JSON}
+_RENDERABLE_FORMATS = {ReportExportFormat.MARKDOWN, ReportExportFormat.JSON, ReportExportFormat.PDF}
+_EXTENSION_BY_FORMAT = {
+    ReportExportFormat.MARKDOWN: "md",
+    ReportExportFormat.JSON: "json",
+    ReportExportFormat.PDF: "pdf",
+}
+_CONTENT_TYPE_BY_FORMAT = {
+    ReportExportFormat.MARKDOWN: "text/markdown",
+    ReportExportFormat.JSON: "application/json",
+    ReportExportFormat.PDF: "application/pdf",
+}
 
 
 def _storage() -> RawArtifactStorage:
@@ -387,11 +397,11 @@ async def create_export(
         if export_format == ReportExportFormat.MARKDOWN:
             rendered = export_render.render_markdown(report, sections, evidence_by_section)
             content_bytes = rendered.encode("utf-8")
-            extension = "md"
+        elif export_format == ReportExportFormat.PDF:
+            content_bytes = export_render.render_pdf(report, sections, evidence_by_section)
         else:
             rendered_json = export_render.render_json(report, sections, evidence_by_section)
             content_bytes = json.dumps(rendered_json, indent=2).encode("utf-8")
-            extension = "json"
 
         stored = _storage().save(
             source_key="reports",
@@ -399,8 +409,8 @@ async def create_export(
             item_key=str(export.id),
             captured_at=datetime.now(UTC),
             content=content_bytes,
-            content_type="application/json" if extension == "json" else "text/markdown",
-            extension=extension,
+            content_type=_CONTENT_TYPE_BY_FORMAT[export_format],
+            extension=_EXTENSION_BY_FORMAT[export_format],
         )
         await report_repo.finalize_export(
             session,
@@ -440,6 +450,27 @@ async def get_export(report_id: UUID, export_id: UUID, session: DbSession) -> Re
     if export is None or export.report_id != report_id:
         raise HTTPException(status_code=404, detail="export not found")
     return await _to_export_response(export)
+
+
+@router.get("/{report_id}/exports/{export_id}/download")
+async def download_export(report_id: UUID, export_id: UUID, session: DbSession) -> Response:
+    """Raw bytes for the export artifact — the only way to retrieve a PDF
+    export (binary, so it isn't embedded in `ReportExportResponse.content`
+    the way markdown/JSON are)."""
+    await _get_report_or_404(session, report_id)
+    export = await report_repo.get_export(session, export_id=export_id)
+    if export is None or export.report_id != report_id:
+        raise HTTPException(status_code=404, detail="export not found")
+    if export.status != ReportExportStatus.COMPLETED or not export.storage_key:
+        raise HTTPException(status_code=400, detail="export has not completed successfully")
+
+    raw = _storage().read(export.storage_key)
+    filename = f"report-{report_id}.{_EXTENSION_BY_FORMAT[export.export_format]}"
+    return Response(
+        content=raw,
+        media_type=_CONTENT_TYPE_BY_FORMAT[export.export_format],
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post(
@@ -482,11 +513,12 @@ async def email_export(
 async def _to_export_response(export: ReportExport) -> ReportExportResponse:
     content: str | dict | None = None
     if export.status == ReportExportStatus.COMPLETED and export.storage_key:
-        raw = _storage().read(export.storage_key)
         if export.export_format == ReportExportFormat.JSON:
-            content = json.loads(raw)
-        else:
-            content = raw.decode("utf-8")
+            content = json.loads(_storage().read(export.storage_key))
+        elif export.export_format == ReportExportFormat.MARKDOWN:
+            content = _storage().read(export.storage_key).decode("utf-8")
+        # PDF is binary — no inline preview text; fetch via the /download
+        # endpoint instead.
     return ReportExportResponse(
         id=export.id,
         report_id=export.report_id,
