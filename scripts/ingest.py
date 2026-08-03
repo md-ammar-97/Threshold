@@ -23,6 +23,7 @@ crawls (see `sources/crawl_safety.py`); quickcommerce is a free RSS pull.
 
 import argparse
 import asyncio
+import socket
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -31,6 +32,25 @@ from typing import Any
 
 BACKEND_SRC = Path(__file__).resolve().parents[1] / "backend" / "src"
 sys.path.insert(0, str(BACKEND_SRC))
+
+# Every connector's own HTTP client sets an explicit timeout (see
+# sources/apify_actor.py, apple_app_store.py, public_web.py, web_crawler.py)
+# except google_play.py, which goes through the google_play_scraper library's
+# raw urlopen() call with no timeout at all. Confirmed live: from a cloud
+# host's IP, Google Play silently black-holed the connection and the process
+# hung indefinitely — asyncio.wait_for() around the collection call (see
+# ingestion/service.py) unblocks the *application* logic correctly, but
+# can't stop the underlying OS thread genuinely stuck in a blocking socket
+# call, and Python's ThreadPoolExecutor waits for every worker thread to
+# finish before the process can exit — so the whole `ingest.py` subprocess
+# stayed hung even though the timeout fired internally. This process-wide
+# default is the actual fix: it makes the stuck socket call itself raise
+# rather than block forever, so the thread — and therefore the process —
+# can actually finish. Safe to set globally here since each `ingest.py`
+# invocation is a single-purpose, single-connector process (see this
+# script's own docstring), and every other connector already manages its
+# own httpx timeout independently of this socket-module default.
+socket.setdefaulttimeout(120)
 
 from instamart_engine.core.config import Settings, get_settings  # noqa: E402
 from instamart_engine.core.database import get_session_factory  # noqa: E402
