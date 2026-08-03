@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # machine using the conventional 5432/6379. See .env.example.
     DATABASE_URL: str = "postgresql+asyncpg://instamart:instamart@localhost:5434/instamart"
     REDIS_URL: str = "redis://localhost:6381/0"
+    # Comma-separated allowed CORS origins for the deployed frontend (Vercel,
+    # etc.) in addition to local dev. No wildcard support here on purpose —
+    # allow_credentials=True in api/main.py forbids `*` per the CORS spec.
+    CORS_ORIGINS: str = "http://localhost:3000"
 
     # Raw artifact storage
     RAW_STORAGE_BACKEND: Literal["filesystem", "supabase"] = "filesystem"

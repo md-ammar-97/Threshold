@@ -24,6 +24,8 @@ envVarGroups:
     envVars:
       - key: APP_ENV
         value: production
+      - key: CORS_ORIGINS
+        sync: false # set to your deployed Vercel URL(s), comma-separated
       - key: DATABASE_URL
         sync: false
       - key: RAW_STORAGE_BACKEND
